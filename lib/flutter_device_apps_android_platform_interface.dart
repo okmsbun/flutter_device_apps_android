@@ -2,6 +2,12 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'flutter_device_apps_android_method_channel.dart';
 
+/// The interface that implementations of flutter_device_apps_android must implement.
+///
+/// Platform implementations should extend this class rather than implementing it as `FlutterDeviceAppsAndroidPlatform`.
+/// Extending this class (using `extends`) ensures that the subclass will get the default
+/// implementation, while platform implementations that `implements` this interface will be
+/// broken by newly added [FlutterDeviceAppsAndroidPlatform] methods.
 abstract class FlutterDeviceAppsAndroidPlatform extends PlatformInterface {
   /// Constructs a FlutterDeviceAppsAndroidPlatform.
   FlutterDeviceAppsAndroidPlatform() : super(token: _token);
@@ -23,6 +29,9 @@ abstract class FlutterDeviceAppsAndroidPlatform extends PlatformInterface {
     _instance = instance;
   }
 
+  /// Returns the platform version.
+  ///
+  /// Throws an [UnimplementedError] when the method is not implemented on the platform.
   Future<String?> getPlatformVersion() {
     throw UnimplementedError('platformVersion() has not been implemented.');
   }

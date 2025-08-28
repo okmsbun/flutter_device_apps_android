@@ -11,7 +11,7 @@ class MethodChannelFlutterDeviceAppsAndroid extends FlutterDeviceAppsAndroidPlat
 
   @override
   Future<String?> getPlatformVersion() async {
-    final version = await methodChannel.invokeMethod<String>('getPlatformVersion');
+    final String? version = await methodChannel.invokeMethod<String>('getPlatformVersion');
     return version;
   }
 }
