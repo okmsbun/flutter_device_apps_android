@@ -1,3 +1,3 @@
-## 0.0.1
-
-* TODO: Describe initial release.
+## 0.1.0
+- First public Android implementation for `flutter_device_apps`.
+- Adds listApps, getApp, openApp, and appChanges (EventChannel).
