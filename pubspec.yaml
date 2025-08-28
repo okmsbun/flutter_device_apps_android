@@ -12,7 +12,6 @@ dependencies:
     sdk: flutter
   flutter_device_apps_platform_interface:
     path: ../flutter_device_apps_platform_interface
-  plugin_platform_interface: ^2.1.7
 
 dev_dependencies:
   flutter_lints: ^5.0.0
@@ -25,3 +24,4 @@ flutter:
       android:
         package: com.okmsbun.flutter_device_apps_android
         pluginClass: FlutterDeviceAppsAndroidPlugin
+        dartPluginClass: FlutterDeviceAppsAndroid

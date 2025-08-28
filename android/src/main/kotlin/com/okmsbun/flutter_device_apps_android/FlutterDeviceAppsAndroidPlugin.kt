@@ -91,7 +91,7 @@ class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         if (pkg == null) return result.error("ARG", "packageName required", null)
         scope.launch {
           try {
-            val m = getAppMap(pkg, includeIcon) // may be null if not found
+            val m = getAppMap(pkg, includeIcon)
             mainHandler.post { result.success(m) }
           } catch (e: Exception) {
             mainHandler.post { result.error("ERR_GET", e.message, null) }
@@ -180,14 +180,34 @@ class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
   private fun getAppMap(packageName: String, includeIcon: Boolean): Map<String, Any?>? {
     val pInfo: PackageInfo = try {
-      pm.getPackageInfo(packageName, 0)
-    } catch (_: Exception) { return null }
-
-    val aInfo = pInfo.applicationInfo
+      if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+        pm.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
+      } else {
+        @Suppress("DEPRECATION")
+        pm.getPackageInfo(packageName, 0)
+      }
+    } catch (_: Exception) {
+      return null
+    }
+  
+    val aInfo: ApplicationInfo = pInfo.applicationInfo ?: return null
+  
     val isSystem = (aInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-    val label = pm.getApplicationLabel(aInfo).toString()
-    val iconBytes = if (includeIcon) drawableToBytes(pm.getApplicationIcon(aInfo)) else null
-
+    val label = try {
+      pm.getApplicationLabel(aInfo).toString()
+    } catch (_: Exception) {
+      packageName
+    }
+  
+    val iconBytes: ByteArray? = if (includeIcon) {
+      try {
+        val drawable = pm.getApplicationIcon(aInfo)
+        drawableToBytes(drawable)
+      } catch (_: Exception) {
+        null
+      }
+    } else null
+  
     val versionCode: Long = try {
       val m = pInfo.javaClass.getMethod("getLongVersionCode")
       (m.invoke(pInfo) as Long)
@@ -195,7 +215,7 @@ class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       @Suppress("DEPRECATION")
       pInfo.versionCode.toLong()
     }
-
+  
     return mapOf(
       "packageName" to packageName,
       "appName" to label,
@@ -207,6 +227,7 @@ class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       "iconBytes" to iconBytes
     )
   }
+  
 
   private fun drawableToBytes(drawable: Drawable): ByteArray {
     val bmp = when (drawable) {
