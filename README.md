@@ -21,7 +21,7 @@ The umbrella package will include this implementation transitively.
 * **Open app settings** (`openAppSettings`) - Open system app settings screen
 * **Uninstall apps** (`uninstallApp`) - Opens system uninstall screen
 * **Get installer store** (`getInstallerStore`) - Get information about which store installed the app
-* **Stream app changes** (`appChanges`) - Monitor install, uninstall, update, enable, disable events
+* **Stream app changes** (`appChanges`) - Monitor install, uninstall, update events
 * **Control monitoring** (`startAppChangeStream`, `stopAppChangeStream`) - Start/stop app change monitoring
 
 ---
