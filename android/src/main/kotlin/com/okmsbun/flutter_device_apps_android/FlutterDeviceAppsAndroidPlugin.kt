@@ -174,6 +174,20 @@ class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           }
         }
       }
+      "getInstallerStore" -> {
+        val pkg = call.argument<String>("packageName")
+        if (pkg == null) {
+          result.error("ARG", "packageName required", null)
+          return
+        }
+        try {
+          val installer = pm.getInstallerPackageName(pkg)
+          result.success(installer)
+        } catch (e: Exception) {
+          result.error("ERR_INSTALLER", e.message, null)
+        }
+      }
+
 
       else -> result.notImplemented()
     }

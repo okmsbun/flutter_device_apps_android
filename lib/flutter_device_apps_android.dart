@@ -73,4 +73,12 @@ class FlutterDeviceAppsAndroid extends FlutterDeviceAppsPlatform {
     });
     return ok ?? false;
   }
+
+  @override
+  Future<String?> getInstallerStore(String packageName) async {
+    final String? store = await _mch.invokeMethod('getInstallerStore', {
+      'packageName': packageName,
+    });
+    return store;
+  }
 }
