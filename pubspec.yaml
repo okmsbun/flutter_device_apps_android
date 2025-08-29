@@ -2,8 +2,8 @@ name: flutter_device_apps_android
 description: Android implementation of flutter_device_apps (federated plugin).
 version: 0.1.2
 
-repository: https://github.com/okmsbun/flutter_device_apps
-issue_tracker: https://github.com/okmsbun/flutter_device_apps/issues
+repository: https://github.com/okmsbun/flutter_device_apps_android
+issue_tracker: https://github.com/okmsbun/flutter_device_apps_android/issues
 topics:
   - flutter
   - plugin
