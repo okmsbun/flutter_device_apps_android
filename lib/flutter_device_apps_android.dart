@@ -65,4 +65,12 @@ class FlutterDeviceAppsAndroid extends FlutterDeviceAppsPlatform {
     });
     return ok;
   }
+
+  @override
+  Future<bool> uninstallApp(String packageName) async {
+    final bool? ok = await _mch.invokeMethod<bool>('uninstallApp', {
+      'packageName': packageName,
+    });
+    return ok ?? false;
+  }
 }

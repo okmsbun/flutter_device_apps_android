@@ -148,6 +148,33 @@ class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           }
         }
       }
+      "uninstallApp" -> {
+        val pkg = call.argument<String>("packageName")
+        if (pkg == null) {
+          result.error("ARG", "packageName required", null)
+          return
+        }
+        try {
+          val intent = Intent(Intent.ACTION_UNINSTALL_PACKAGE).apply {
+            data = android.net.Uri.parse("package:$pkg")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+          }
+          appContext.startActivity(intent)
+          result.success(true)
+        } catch (e: Exception) {
+          try {
+            val alt = Intent(Intent.ACTION_DELETE).apply {
+              data = android.net.Uri.parse("package:$pkg")
+              addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            appContext.startActivity(alt)
+            result.success(true)
+          } catch (e2: Exception) {
+            result.error("ERR_UNINSTALL", e2.message, null)
+          }
+        }
+      }
+
       else -> result.notImplemented()
     }
   }
