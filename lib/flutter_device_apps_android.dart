@@ -20,8 +20,8 @@ class FlutterDeviceAppsAndroid extends FlutterDeviceAppsPlatform {
   Stream<AppChangeEvent>? _appChanges;
   @override
   Stream<AppChangeEvent> get appChanges => _appChanges ??= _ech.receiveBroadcastStream().map((e) {
-    return AppChangeEvent.fromMap(Map<String, Object?>.from(e as Map));
-  });
+        return AppChangeEvent.fromMap(Map<String, Object?>.from(e as Map));
+      });
 
   @override
   Future<void> startAppChangeStream() => _mch.invokeMethod('startAppChangeStream');
@@ -55,6 +55,14 @@ class FlutterDeviceAppsAndroid extends FlutterDeviceAppsPlatform {
   @override
   Future<bool> openApp(String packageName) async {
     final bool ok = await _mch.invokeMethod('openApp', {'packageName': packageName});
+    return ok;
+  }
+
+  @override
+  Future<bool> openAppSettings(String packageName) async {
+    final bool ok = await _mch.invokeMethod('openAppSettings', {
+      'packageName': packageName,
+    });
     return ok;
   }
 }

@@ -123,6 +123,31 @@ class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         unregisterReceiverIfNeeded()
         result.success(null)
       }
+      "openAppSettings" -> {
+        val pkg = call.argument<String>("packageName")
+        if (pkg == null) {
+          result.error("ARG", "packageName required", null)
+          return
+        }
+        try {
+          val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = android.net.Uri.fromParts("package", pkg, null)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+          }
+          appContext.startActivity(intent)
+          result.success(true)
+        } catch (e: Exception) {
+          try {
+            val fallback = Intent(android.provider.Settings.ACTION_APPLICATION_SETTINGS).apply {
+              addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            appContext.startActivity(fallback)
+            result.success(true)
+          } catch (e2: Exception) {
+            result.error("ERR_OPEN_SETTINGS", e2.message, null)
+          }
+        }
+      }
       else -> result.notImplemented()
     }
   }
