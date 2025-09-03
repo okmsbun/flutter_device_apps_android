@@ -1,3 +1,11 @@
+## 0.2.0
+- Enhanced README.md with professional badge layout for better package visibility
+- Added centered HTML badges for pub.dev, GitHub stars, Flutter documentation, and MIT license
+- Added umbrella package badge linking to main flutter_device_apps package
+- Improved documentation presentation following modern Flutter package standards
+- Updated flutter_device_apps_platform_interface dependency to ^0.2.0
+- Enhanced package branding and visual consistency across federated plugin family
+
 ## 0.1.2
 - Added `openAppSettings` implementation using `Settings.ACTION_APPLICATION_DETAILS_SETTINGS`
 - Added `uninstallApp` implementation using `Intent.ACTION_UNINSTALL_PACKAGE` with fallback to `ACTION_DELETE`
