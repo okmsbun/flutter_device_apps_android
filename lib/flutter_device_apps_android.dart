@@ -17,17 +17,29 @@ class FlutterDeviceAppsAndroid extends FlutterDeviceAppsPlatform {
   static const MethodChannel _mch = MethodChannel('flutter_device_apps/methods');
   static const EventChannel _ech = EventChannel('flutter_device_apps/app_changes');
 
-  Stream<AppChangeEvent>? _appChanges;
-  @override
-  Stream<AppChangeEvent> get appChanges => _appChanges ??= _ech.receiveBroadcastStream().map((e) {
-        return AppChangeEvent.fromMap(Map<String, Object?>.from(e as Map));
-      });
+  late final StreamController<AppChangeEvent> _controller =
+      StreamController<AppChangeEvent>.broadcast(
+    onListen: _onListen,
+    onCancel: _onCancel,
+  );
+
+  Future<void> _onListen() async {
+    await _mch.invokeMethod('startAppChangeStream');
+    _ech.receiveBroadcastStream().listen(
+      (event) {
+        _controller.add(AppChangeEvent.fromMap(Map<String, Object?>.from(event as Map)));
+      },
+      onError: (error) => _controller.addError(error),
+      onDone: () => _controller.close(),
+    );
+  }
+
+  Future<void> _onCancel() async {
+    await _mch.invokeMethod('stopAppChangeStream');
+  }
 
   @override
-  Future<void> startAppChangeStream() => _mch.invokeMethod('startAppChangeStream');
-
-  @override
-  Future<void> stopAppChangeStream() => _mch.invokeMethod('stopAppChangeStream');
+  Stream<AppChangeEvent> get appChanges => _controller.stream;
 
   @override
   Future<List<AppInfo>> listApps({
