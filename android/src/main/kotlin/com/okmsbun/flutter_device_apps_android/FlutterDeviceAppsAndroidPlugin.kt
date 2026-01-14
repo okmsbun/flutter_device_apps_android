@@ -34,7 +34,7 @@ class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     override fun onReceive(context: Context?, intent: Intent?) {
       val i = intent ?: return
       val pkg = i.data?.schemeSpecificPart ?: return
-      val replacing = i.getBooleanExtra(Intent.EXTRA_REPLACING, false)
+      val replacing = i.extras?.get(Intent.EXTRA_REPLACING) as? Boolean
       val action = i.action ?: return
       val type = when (action) {
         Intent.ACTION_PACKAGE_ADDED -> "installed"
