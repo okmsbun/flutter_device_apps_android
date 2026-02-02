@@ -1,3 +1,7 @@
+## 0.5.1
+- Added support for additional `AppInfo` fields from the Android package manager: `category`, `targetSdkVersion`, `minSdkVersion`, `enabled`, `processName`, `installLocation`, `requestedPermissions`.
+- Populates `requestedPermissions` via `PackageManager.GET_PERMISSIONS`.
+
 ## 0.4.0
 App change events now forward the raw Android action string to Dart, letting the Dart side handle event type mapping; no breaking changes.
 
