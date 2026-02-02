@@ -8,6 +8,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.NonNull
@@ -257,7 +258,9 @@ class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     }
   
     val aInfo: ApplicationInfo = pInfo.applicationInfo ?: return null
-  
+
+    val category: Int? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) aInfo.category else null
+
     val isSystem = (aInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
     val label = try {
       pm.getApplicationLabel(aInfo).toString()
@@ -290,7 +293,8 @@ class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       "firstInstallTime" to pInfo.firstInstallTime,
       "lastUpdateTime"  to pInfo.lastUpdateTime,
       "isSystem" to isSystem,
-      "iconBytes" to iconBytes
+      "iconBytes" to iconBytes,
+      "category" to category
     )
   }
   
