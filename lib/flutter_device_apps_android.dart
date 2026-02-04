@@ -65,6 +65,17 @@ class FlutterDeviceAppsAndroid extends FlutterDeviceAppsPlatform {
   }
 
   @override
+  Future<List<String>?> getRequestedPermissions(String packageName) async {
+    final List<dynamic>? raw = await _mch.invokeMethod<List<dynamic>>(
+      'getRequestedPermissions',
+      {
+        'packageName': packageName,
+      },
+    );
+    return raw?.map((e) => e.toString()).toList();
+  }
+
+  @override
   Future<bool> openApp(String packageName) async {
     final bool ok = await _mch.invokeMethod('openApp', {'packageName': packageName});
     return ok;

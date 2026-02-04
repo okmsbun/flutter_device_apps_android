@@ -14,14 +14,14 @@ import kotlin.test.Test
  */
 
 internal class FlutterDeviceAppsAndroidPluginTest {
-    @Test
-    fun onMethodCall_getPlatformVersion_returnsExpectedValue() {
-        val plugin = FlutterDeviceAppsAndroidPlugin()
+  @Test
+  fun onMethodCall_getRequestedPermissions_handlesNullPackageGracefully() {
+    val plugin = FlutterDeviceAppsAndroidPlugin()
+    val call = MethodCall("getRequestedPermissions", null)
+    val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
 
-        val call = MethodCall("getPlatformVersion", null)
-        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
-        plugin.onMethodCall(call, mockResult)
+    plugin.onMethodCall(call, mockResult)
 
-        Mockito.verify(mockResult).success("Android " + android.os.Build.VERSION.RELEASE)
-    }
+    Mockito.verify(mockResult).error(Mockito.eq("ARG"), Mockito.eq("packageName required"), Mockito.isNull())
+  }
 }

@@ -99,6 +99,35 @@ class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           }
         }
       }
+      "getRequestedPermissions" -> {
+        val pkg = call.argument<String>("packageName")
+        if (pkg == null) {
+          result.error("ARG", "packageName required", null)
+          return
+        }
+        scope.launch {
+          try {
+            val pInfo: PackageInfo = try {
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.getPackageInfo(
+                  pkg,
+                  PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS.toLong())
+                )
+              } else {
+                @Suppress("DEPRECATION")
+                pm.getPackageInfo(pkg, PackageManager.GET_PERMISSIONS)
+              }
+            } catch (_: Exception) {
+              mainHandler.post { result.success(null) }
+              return@launch
+            }
+            val requested = pInfo.requestedPermissions?.toList()
+            mainHandler.post { result.success(requested) }
+          } catch (e: Exception) {
+            mainHandler.post { result.error("ERR_PERMS", e.message, null) }
+          }
+        }
+      }
       "openApp" -> {
         val pkg = call.argument<String>("packageName")
         if (pkg == null) return result.error("ARG", "packageName required", null)
@@ -248,10 +277,13 @@ class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private fun getAppMap(packageName: String, includeIcon: Boolean): Map<String, Any?>? {
     val pInfo: PackageInfo = try {
       if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-        pm.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS.toLong()))
+        pm.getPackageInfo(
+          packageName,
+          PackageManager.PackageInfoFlags.of(0)
+        )
       } else {
         @Suppress("DEPRECATION")
-        pm.getPackageInfo(packageName, PackageManager.GET_PERMISSIONS)
+        pm.getPackageInfo(packageName, 0)
       }
     } catch (_: Exception) {
       return null
@@ -260,7 +292,6 @@ class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     val aInfo: ApplicationInfo = pInfo.applicationInfo ?: return null
 
     val category: Int? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) aInfo.category else null
-    val requestedPermissionsList: List<String>? = pInfo.requestedPermissions?.toList()
 
     val isSystem = (aInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
     val label = try {
@@ -300,8 +331,7 @@ class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       "minSdkVersion" to aInfo.minSdkVersion,
       "enabled" to aInfo.enabled,
       "processName" to aInfo.processName,
-      "installLocation" to pInfo.installLocation,
-      "requestedPermissions" to requestedPermissionsList
+      "installLocation" to pInfo.installLocation
     )
   }
   
