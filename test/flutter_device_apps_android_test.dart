@@ -257,7 +257,9 @@ void main() {
 }
 
 /// Mock handler for method calls
-dynamic _handleMethodCall(MethodCall call) {
+Object? _handleMethodCall(MethodCall call) {
+  final args = call.arguments as Map<Object?, Object?>?;
+
   switch (call.method) {
     case 'listApps':
       return [
@@ -266,26 +268,26 @@ dynamic _handleMethodCall(MethodCall call) {
       ];
 
     case 'getApp':
-      final packageName = call.arguments['packageName'] as String;
+      final packageName = args!['packageName']! as String;
       if (packageName == 'com.nonexistent.app') return null;
       return _createAppMap(packageName, 'App 1');
 
     case 'getRequestedPermissions':
-      final packageName = call.arguments['packageName'] as String;
+      final packageName = args!['packageName']! as String;
       if (packageName == 'com.nonexistent.app') return null;
       return ['android.permission.INTERNET', 'android.permission.CAMERA'];
 
     case 'openApp':
     case 'openAppSettings':
-      final packageName = call.arguments['packageName'] as String;
+      final packageName = args!['packageName']! as String;
       return packageName != 'com.nonexistent.app';
 
     case 'uninstallApp':
-      final packageName = call.arguments['packageName'] as String;
+      final packageName = args!['packageName']! as String;
       return packageName != 'com.nonexistent.app';
 
     case 'getInstallerStore':
-      final packageName = call.arguments['packageName'] as String;
+      final packageName = args!['packageName']! as String;
       if (packageName == 'com.sideloaded.app') return null;
       return 'com.android.vending';
 

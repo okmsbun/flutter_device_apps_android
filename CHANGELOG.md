@@ -1,3 +1,11 @@
+## 0.6.0
+- **BREAKING**: Updated to match platform interface 0.6.0 - `requestedPermissions` removed from `AppInfo`
+- Added `getRequestedPermissions(String packageName)` method implementation for on-demand permission retrieval
+- Added GitHub Actions workflows for Android unit tests, quality checks, and PR enforcement
+- Added comprehensive Dart unit tests (27 tests) for method channel mocking
+- Added Kotlin unit tests (11 tests) with Robolectric for Android plugin
+- Made `FlutterDeviceAppsAndroidPlugin` class `open` with `protected` fields for testability
+
 ## 0.5.1
 - Added support for additional `AppInfo` fields from the Android package manager: `category`, `targetSdkVersion`, `minSdkVersion`, `enabled`, `processName`, `installLocation`, `requestedPermissions`.
 - Populates `requestedPermissions` via `PackageManager.GET_PERMISSIONS`.
