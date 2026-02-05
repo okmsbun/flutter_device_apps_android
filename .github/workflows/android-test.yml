@@ -2,7 +2,7 @@ name: Android Tests
 
 on:
   pull_request:
-    branches: ["main"]
+    branches: ["develop"]
 
 jobs:
   android-test:
