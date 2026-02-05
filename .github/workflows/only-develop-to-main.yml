@@ -5,7 +5,7 @@ on:
     branches: ["main"]
 
 jobs:
-  enforce:
+  only-develop-to-main:
     runs-on: ubuntu-latest
     steps:
       - name: Allow only develop -> main PRs
