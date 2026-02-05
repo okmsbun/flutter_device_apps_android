@@ -19,12 +19,12 @@ import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.*
 import java.io.ByteArrayOutputStream
 
-class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
+open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
 
   private lateinit var methodChannel: MethodChannel
   private lateinit var eventChannel: EventChannel
-  private lateinit var appContext: Context
-  private lateinit var pm: PackageManager
+  protected lateinit var appContext: Context
+  protected lateinit var pm: PackageManager
 
   private val mainHandler = Handler(Looper.getMainLooper())
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

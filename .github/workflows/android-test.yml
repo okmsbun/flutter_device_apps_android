@@ -1,0 +1,40 @@
+name: Android Tests
+
+on:
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  android-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create temporary Flutter project
+        run: |
+          flutter create --template=app /tmp/test_app
+          cd /tmp/test_app
+
+          # Add the plugin with path dependency
+          flutter pub add flutter_device_apps_android --path $GITHUB_WORKSPACE
+
+          # Build to generate Gradle files
+          flutter build apk --debug
+
+      - name: Run Android unit tests
+        run: |
+          cd /tmp/test_app/android
+          ./gradlew :flutter_device_apps_android:testDebugUnitTest
