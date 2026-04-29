@@ -322,6 +322,7 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
       "appName" to label,
       "versionName" to pInfo.versionName,
       "versionCode" to versionCode,
+      "uid" to aInfo.uid,
       "firstInstallTime" to pInfo.firstInstallTime,
       "lastUpdateTime"  to pInfo.lastUpdateTime,
       "isSystem" to isSystem,
