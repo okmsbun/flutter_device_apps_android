@@ -18,6 +18,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.*
 import java.io.ByteArrayOutputStream
+import java.io.File
 
 open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
 
@@ -295,6 +296,22 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
 
     val isSystem = (aInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
     val isOnExternalStorage = (aInfo.flags and ApplicationInfo.FLAG_EXTERNAL_STORAGE) != 0
+    val apkPaths = mutableListOf<String>().apply {
+      aInfo.sourceDir?.let { add(it) }
+      aInfo.splitSourceDirs?.forEach { splitPath ->
+        if (splitPath != null) add(splitPath)
+      }
+    }
+    val apkSizeBytes: Long? = if (apkPaths.isEmpty()) {
+      null
+    } else {
+      apkPaths.asSequence().map { path ->
+        runCatching {
+          val file = File(path)
+          if (file.exists()) file.length() else 0L
+        }.getOrDefault(0L)
+      }.sum()
+    }
     val label = try {
       pm.getApplicationLabel(aInfo).toString()
     } catch (_: Exception) {
@@ -325,6 +342,7 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
       "versionCode" to versionCode,
       "uid" to aInfo.uid,
       "apkPath" to aInfo.sourceDir,
+      "apkSizeBytes" to apkSizeBytes,
       "dataPath" to aInfo.dataDir,
       "isOnExternalStorage" to isOnExternalStorage,
       "firstInstallTime" to pInfo.firstInstallTime,

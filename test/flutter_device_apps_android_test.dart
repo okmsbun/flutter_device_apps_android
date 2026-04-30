@@ -75,11 +75,13 @@ void main() {
       expect(apps[0].packageName, 'com.example.app1');
       expect(apps[0].uid, 10123);
       expect(apps[0].apkPath, '/data/app/com.example.app1/base.apk');
+      expect(apps[0].apkSizeBytes, 12345678);
       expect(apps[0].dataPath, '/data/user/0/com.example.app1');
       expect(apps[0].isOnExternalStorage, false);
       expect(apps[1].packageName, 'com.example.app2');
       expect(apps[1].uid, 10124);
       expect(apps[1].apkPath, '/data/app/com.example.app2/base.apk');
+      expect(apps[1].apkSizeBytes, 22334455);
       expect(apps[1].dataPath, '/data/user/0/com.example.app2');
       expect(apps[1].isOnExternalStorage, true);
     });
@@ -124,6 +126,7 @@ void main() {
       expect(app.appName, 'App 1');
       expect(app.uid, 10123);
       expect(app.apkPath, '/data/app/com.example.app1/base.apk');
+      expect(app.apkSizeBytes, 12345678);
       expect(app.dataPath, '/data/user/0/com.example.app1');
       expect(app.isOnExternalStorage, false);
     });
@@ -315,6 +318,7 @@ Object? _handleMethodCall(MethodCall call) {
 Map<String, Object?> _createAppMap(String packageName, String appName) {
   final int uid = packageName == 'com.example.app1' ? 10123 : 10124;
   final bool isOnExternalStorage = packageName == 'com.example.app2';
+  final int apkSizeBytes = packageName == 'com.example.app1' ? 12345678 : 22334455;
 
   return {
     'packageName': packageName,
@@ -323,6 +327,7 @@ Map<String, Object?> _createAppMap(String packageName, String appName) {
     'versionCode': 1,
     'uid': uid,
     'apkPath': '/data/app/$packageName/base.apk',
+    'apkSizeBytes': apkSizeBytes,
     'dataPath': '/data/user/0/$packageName',
     'isOnExternalStorage': isOnExternalStorage,
     'isSystem': false,
