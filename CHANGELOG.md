@@ -1,3 +1,8 @@
+## 0.7.0
+- Expanded Android app details payload with additional raw fields: `uid`, `apkPath`, `apkSizeBytes`, `dataPath`, and `isOnExternalStorage`.
+- Added APK size calculation in bytes using `ApplicationInfo.sourceDir` and `splitSourceDirs`.
+- Updated Dart unit tests for method channel mapping of the new fields.
+
 ## 0.6.0
 - **BREAKING**: Updated to match platform interface 0.6.0 - `requestedPermissions` removed from `AppInfo`
 - Added `getRequestedPermissions(String packageName)` method implementation for on-demand permission retrieval
