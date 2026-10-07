@@ -78,9 +78,10 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
         val includeSystem = call.argument<Boolean>("includeSystem") ?: false
         val onlyLaunchable = call.argument<Boolean>("onlyLaunchable") ?: true
         val includeIcons = call.argument<Boolean>("includeIcons") ?: false
+        val packageNamePrefix = call.argument<String>("packageNamePrefix")
         scope.launch {
           try {
-            val apps = listAppsInternal(includeSystem, onlyLaunchable, includeIcons)
+            val apps = listAppsInternal(includeSystem, onlyLaunchable, includeIcons, packageNamePrefix)
             mainHandler.post { result.success(apps) }
           } catch (e: Exception) {
             mainHandler.post { result.error("ERR_LIST", e.message, null) }
@@ -98,6 +99,52 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
           } catch (e: Exception) {
             mainHandler.post { result.error("ERR_GET", e.message, null) }
           }
+        }
+      }
+      "getAppIcon" -> {
+        val pkg = call.argument<String>("packageName")
+        if (pkg.isNullOrBlank()) return result.error("ARG", "packageName required", null)
+        scope.launch {
+          try {
+            val bytes = drawableToBytes(pm.getApplicationIcon(pkg))
+            mainHandler.post { result.success(bytes) }
+          } catch (_: PackageManager.NameNotFoundException) {
+            mainHandler.post { result.success(null) }
+          } catch (e: Exception) {
+            mainHandler.post { result.error("ERR_ICON", e.message, null) }
+          }
+        }
+      }
+      "isAppInstalled", "isSystemApp", "isAppEnabled" -> {
+        val pkg = call.argument<String>("packageName")
+        if (pkg.isNullOrBlank()) return result.error("ARG", "packageName required", null)
+        try {
+          val aInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pm.getApplicationInfo(pkg, PackageManager.ApplicationInfoFlags.of(0))
+          } else {
+            @Suppress("DEPRECATION")
+            pm.getApplicationInfo(pkg, 0)
+          }
+          result.success(
+            when (call.method) {
+              "isAppInstalled" -> true
+              "isSystemApp" -> (aInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+              else -> aInfo.enabled
+            }
+          )
+        } catch (_: PackageManager.NameNotFoundException) {
+          result.success(if (call.method == "isAppInstalled") false else null)
+        } catch (e: Exception) {
+          result.error("ERR_QUERY", e.message, null)
+        }
+      }
+      "isAppLaunchable" -> {
+        val pkg = call.argument<String>("packageName")
+        if (pkg.isNullOrBlank()) return result.error("ARG", "packageName required", null)
+        try {
+          result.success(pm.getLaunchIntentForPackage(pkg) != null)
+        } catch (e: Exception) {
+          result.error("ERR_QUERY", e.message, null)
         }
       }
       "getRequestedPermissions" -> {
@@ -205,6 +252,39 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
           }
         }
       }
+      "getInstallSourceInfo" -> {
+        val pkg = call.argument<String>("packageName")
+        if (pkg.isNullOrBlank()) return result.error("ARG", "packageName required", null)
+        try {
+          val source = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val info = pm.getInstallSourceInfo(pkg)
+            mapOf(
+              "installingPackageName" to info.installingPackageName,
+              "initiatingPackageName" to info.initiatingPackageName,
+              "originatingPackageName" to info.originatingPackageName,
+              "packageSource" to if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                info.packageSource
+              } else null,
+              "updateOwnerPackageName" to if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                info.updateOwnerPackageName
+              } else null
+            )
+          } else {
+            try {
+              @Suppress("DEPRECATION")
+              val installer = pm.getInstallerPackageName(pkg)
+              mapOf("installingPackageName" to installer)
+            } catch (_: IllegalArgumentException) {
+              null
+            }
+          }
+          result.success(source)
+        } catch (_: PackageManager.NameNotFoundException) {
+          result.success(null)
+        } catch (e: Exception) {
+          result.error("ERR_INSTALL_SOURCE", e.message, null)
+        }
+      }
       "getInstallerStore" -> {
         val pkg = call.argument<String>("packageName")
         if (pkg == null) {
@@ -212,7 +292,12 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
           return
         }
         try {
-          val installer = pm.getInstallerPackageName(pkg)
+          val installer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            pm.getInstallSourceInfo(pkg).installingPackageName
+          } else {
+            @Suppress("DEPRECATION")
+            pm.getInstallerPackageName(pkg)
+          }
           result.success(installer)
         } catch (e: Exception) {
           result.error("ERR_INSTALLER", e.message, null)
@@ -256,7 +341,12 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
   }
 
   // ---- Helpers ----
-  private fun listAppsInternal(includeSystem: Boolean, onlyLaunchable: Boolean, includeIcons: Boolean): List<Map<String, Any?>> {
+  private fun listAppsInternal(
+    includeSystem: Boolean,
+    onlyLaunchable: Boolean,
+    includeIcons: Boolean,
+    packageNamePrefix: String?
+  ): List<Map<String, Any?>> {
     val packageNames: Set<String> = if (onlyLaunchable) {
       val intent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
       pm.queryIntentActivities(intent, 0).map { it.activityInfo.packageName }.toSet()
@@ -264,6 +354,7 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
       pm.getInstalledApplications(0).map { it.packageName }.toSet()
     }
     return packageNames.mapNotNull { pkg ->
+      if (!packageNamePrefix.isNullOrEmpty() && !pkg.startsWith(packageNamePrefix)) return@mapNotNull null
       try {
         val m = getAppMap(pkg, includeIcons)
         if (m == null) null
