@@ -18,10 +18,7 @@ class FlutterDeviceAppsAndroid extends FlutterDeviceAppsPlatform {
   static const EventChannel _ech = EventChannel('flutter_device_apps/app_changes');
 
   late final StreamController<AppChangeEvent> _controller =
-      StreamController<AppChangeEvent>.broadcast(
-    onListen: _onListen,
-    onCancel: _onCancel,
-  );
+      StreamController<AppChangeEvent>.broadcast(onListen: _onListen, onCancel: _onCancel);
 
   Future<void> _onListen() async {
     await _mch.invokeMethod('startAppChangeStream');
@@ -65,13 +62,26 @@ class FlutterDeviceAppsAndroid extends FlutterDeviceAppsPlatform {
   }
 
   @override
+  Future<Uint8List?> getAppIcon(String packageName) =>
+      _mch.invokeMethod<Uint8List>('getAppIcon', {'packageName': packageName});
+
+  @override
+  Future<bool> isAppInstalled(String packageName) async {
+    final bool? installed = await _mch.invokeMethod<bool>('isAppInstalled', {
+      'packageName': packageName,
+    });
+    return installed ?? false;
+  }
+
+  @override
+  Future<bool?> isSystemApp(String packageName) =>
+      _mch.invokeMethod<bool>('isSystemApp', {'packageName': packageName});
+
+  @override
   Future<List<String>?> getRequestedPermissions(String packageName) async {
-    final List<dynamic>? raw = await _mch.invokeMethod<List<dynamic>>(
-      'getRequestedPermissions',
-      {
-        'packageName': packageName,
-      },
-    );
+    final List<dynamic>? raw = await _mch.invokeMethod<List<dynamic>>('getRequestedPermissions', {
+      'packageName': packageName,
+    });
     return raw?.map((e) => e.toString()).toList();
   }
 
@@ -83,21 +93,25 @@ class FlutterDeviceAppsAndroid extends FlutterDeviceAppsPlatform {
 
   @override
   Future<bool> openAppSettings(String packageName) async {
-    final bool ok = await _mch.invokeMethod('openAppSettings', {
-      'packageName': packageName,
-    });
+    final bool ok = await _mch.invokeMethod('openAppSettings', {'packageName': packageName});
     return ok;
   }
 
   @override
   Future<bool> uninstallApp(String packageName) async {
-    final bool? ok = await _mch.invokeMethod<bool>('uninstallApp', {
-      'packageName': packageName,
-    });
+    final bool? ok = await _mch.invokeMethod<bool>('uninstallApp', {'packageName': packageName});
     return ok ?? false;
   }
 
   @override
+  Future<AppInstallSourceInfo?> getInstallSourceInfo(String packageName) async {
+    final Map? m = await _mch.invokeMethod('getInstallSourceInfo', {'packageName': packageName});
+    return m == null ? null : AppInstallSourceInfo.fromMap(Map<String, Object?>.from(m));
+  }
+
+  @override
+  // Newly deprecated; retain the method for backwards compatibility.
+  @Deprecated('Use getInstallSourceInfo() and its installingPackageName instead.')
   Future<String?> getInstallerStore(String packageName) async {
     final String? store = await _mch.invokeMethod('getInstallerStore', {
       'packageName': packageName,

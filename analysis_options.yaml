@@ -22,9 +22,7 @@ linter:
     avoid_init_to_null: true
     avoid_js_rounded_ints: true
     avoid_multiple_declarations_per_line: true
-    avoid_null_checks_in_equality_operators: true
     avoid_print: true
-    avoid_private_typedef_functions: true
     avoid_redundant_argument_values: true
     avoid_renaming_method_parameters: true
     avoid_return_types_on_setters: true
@@ -86,7 +84,7 @@ linter:
     no_leading_underscores_for_local_identifiers: true
     no_literal_bool_comparisons: true
     no_logic_in_create_state: true
-    no_runtimeType_toString: true
+    no_runtimeType_tostring: true
     no_self_assignments: true
     no_wildcard_variable_uses: true
     non_constant_identifier_names: true
@@ -150,7 +148,6 @@ linter:
     type_init_formals: true
     type_literal_in_constant_pattern: true
     unawaited_futures: true
-    unnecessary_await_in_return: true
     unnecessary_brace_in_string_interps: true
     unnecessary_breaks: true
     unnecessary_const: true
@@ -180,7 +177,6 @@ linter:
     use_enums: true
     use_full_hex_values_for_flutter_colors: true
     use_function_type_syntax_for_parameters: true
-    use_if_null_to_convert_nulls_to_bools: true
     use_is_even_rather_than_modulo: true
     use_late_for_private_fields_and_variables: true
     use_named_constants: true
@@ -201,15 +197,22 @@ linter:
     unnecessary_library_name: true
     use_truncating_division: true
     strict_top_level_inference: true
-    unnecessary_async: true
+    unnecessary_async: false
     unnecessary_underscores: true
     unsafe_variance: true
+    simplify_variable_pattern: true
     specify_nonobvious_property_types: true
     switch_on_type: true
     unnecessary_ignore: true
     unnecessary_unawaited: true
     use_null_aware_elements: true
-    public_member_api_docs: true
+    simple_directive_paths: true
+    var_with_no_type_annotation: true
+    empty_container_bodies: true
+    initialize_in_field_declaration: true
+    unnecessary_primary_constructor_body: true
+    use_declaring_parameters: true
+    migrate_design_widgets: true
     ###-------------------------------------------------------
     omit_local_variable_types: false
     use_setters_to_change_properties: false
@@ -217,7 +220,6 @@ linter:
     unnecessary_final: false
     prefer_expression_function_bodies: false
     prefer_null_aware_method_calls: false
-    prefer_final_parameters: false
     prefer_if_elements_to_conditional_expressions: false
     prefer_double_quotes: false
     avoid_catches_without_on_clauses: false
@@ -234,12 +236,19 @@ linter:
     flutter_style_todos: false
     eol_at_end_of_file: false
     lines_longer_than_80_chars: false
-    one_member_abstracts: false
+    public_member_api_docs: false
     use_build_context_synchronously: false
     do_not_use_environment: false
     omit_obvious_local_variable_types: false
     unintended_html_in_doc_comment: false
     omit_obvious_property_types: false
+    unnecessary_type_name_in_constructor: false
+    async_return_with_no_await: false
+    no_raw_types: false
+    unnecessary_const_in_enum_constructor: false
+    no_dynamic_casts: false
+    remove_deprecations_in_breaking_versions: false
+
 analyzer:
   exclude:
     - build/**
