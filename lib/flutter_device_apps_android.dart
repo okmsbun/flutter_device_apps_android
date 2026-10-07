@@ -20,20 +20,33 @@ class FlutterDeviceAppsAndroid extends FlutterDeviceAppsPlatform {
   late final StreamController<AppChangeEvent> _controller =
       StreamController<AppChangeEvent>.broadcast(onListen: _onListen, onCancel: _onCancel);
 
-  Future<void> _onListen() async {
-    await _mch.invokeMethod('startAppChangeStream');
-    _ech.receiveBroadcastStream().listen(
+  StreamSubscription<dynamic>? _eventSubscription;
+  Future<void> _streamLifecycle = Future<void>.value();
+
+  Future<void> _onListen() => _queueStreamOperation(() async {
+    if (!_controller.hasListener || _eventSubscription != null) return;
+    await _mch.invokeMethod<void>('startAppChangeStream');
+    if (!_controller.hasListener) return;
+    _eventSubscription = _ech.receiveBroadcastStream().listen(
       (event) {
         _controller.add(AppChangeEvent.fromMap(Map<String, Object?>.from(event as Map)));
       },
       onError: (error) => _controller.addError(error),
       onDone: () => _controller.close(),
     );
-  }
+  });
 
-  Future<void> _onCancel() async {
-    await _mch.invokeMethod('stopAppChangeStream');
-  }
+  Future<void> _onCancel() => _queueStreamOperation(() async {
+    await _eventSubscription?.cancel();
+    _eventSubscription = null;
+    await _mch.invokeMethod<void>('stopAppChangeStream');
+  });
+
+  // Complete shutdown before starting a new subscription on the same channel.
+  Future<void> _queueStreamOperation(Future<void> Function() operation) => _streamLifecycle =
+      _streamLifecycle.then((_) => operation()).catchError((Object error, StackTrace stackTrace) {
+        if (!_controller.isClosed) _controller.addError(error, stackTrace);
+      });
 
   @override
   Stream<AppChangeEvent> get appChanges => _controller.stream;

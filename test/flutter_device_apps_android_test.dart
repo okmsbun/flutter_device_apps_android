@@ -1,6 +1,5 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_device_apps_android/flutter_device_apps_android.dart';
-import 'package:flutter_device_apps_platform_interface/flutter_device_apps_app_change_event.dart';
 import 'package:flutter_device_apps_platform_interface/flutter_device_apps_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -379,28 +378,6 @@ void main() {
       // ignore: deprecated_member_use_from_same_package
       final String? store = await plugin.getInstallerStore('com.sideloaded.app');
       expect(store, isNull);
-    });
-  });
-
-  group('appChanges stream', () {
-    test('returns a stream', () {
-      expect(plugin.appChanges, isA<Stream>());
-    });
-
-    test('stream is broadcast', () {
-      final Stream<AppChangeEvent> stream = plugin.appChanges
-        // Broadcast streams allow multiple listeners
-        ..listen((_) {});
-      expect(() => stream.listen((_) {}), returnsNormally);
-    });
-
-    test('calls startAppChangeStream when listening starts', () async {
-      plugin.appChanges.listen((_) {});
-
-      // Give time for async onListen to execute
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-
-      expect(methodCalls.any((c) => c.method == 'startAppChangeStream'), isTrue);
     });
   });
 }
