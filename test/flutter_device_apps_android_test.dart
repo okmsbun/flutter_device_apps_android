@@ -47,17 +47,34 @@ void main() {
         'includeSystem': false,
         'onlyLaunchable': true,
         'includeIcons': false,
+        'packageNamePrefix': null,
       });
     });
 
     test('calls method channel with custom parameters', () async {
-      await plugin.listApps(includeSystem: true, onlyLaunchable: false, includeIcons: true);
+      await plugin.listApps(
+        includeSystem: true,
+        onlyLaunchable: false,
+        includeIcons: true,
+        packageNamePrefix: 'com.example.',
+      );
 
       expect(methodCalls, hasLength(1));
       expect(methodCalls.first.arguments, {
         'includeSystem': true,
         'onlyLaunchable': false,
         'includeIcons': true,
+        'packageNamePrefix': 'com.example.',
+      });
+    });
+
+    test('preserves an empty prefix when calling native code', () async {
+      await plugin.listApps(packageNamePrefix: '');
+      expect(methodCalls.first.arguments, {
+        'includeSystem': false,
+        'onlyLaunchable': true,
+        'includeIcons': false,
+        'packageNamePrefix': '',
       });
     });
 
@@ -168,6 +185,22 @@ void main() {
       expect(methodCalls.first.arguments, {'packageName': 'com.android.settings'});
     });
 
+    test('distinguishes enabled, disabled and unavailable packages', () async {
+      expect(await plugin.isAppEnabled('com.example.app1'), isTrue);
+      expect(await plugin.isAppEnabled('com.example.disabled'), isFalse);
+      expect(await plugin.isAppEnabled('com.nonexistent.app'), isNull);
+      expect(methodCalls.every((call) => call.method == 'isAppEnabled'), isTrue);
+      expect(methodCalls.first.arguments, {'packageName': 'com.example.app1'});
+    });
+
+    test('queries launchability without opening the app or requesting metadata', () async {
+      expect(await plugin.isAppLaunchable('com.example.app1'), isTrue);
+      expect(await plugin.isAppLaunchable('com.example.no_launcher'), isFalse);
+      expect(await plugin.isAppLaunchable('com.nonexistent.app'), isFalse);
+      expect(methodCalls.every((call) => call.method == 'isAppLaunchable'), isTrue);
+      expect(methodCalls.first.arguments, {'packageName': 'com.example.app1'});
+    });
+
     test('preserves query failures rather than reporting a missing package', () async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
         const MethodChannel('flutter_device_apps/methods'),
@@ -179,6 +212,14 @@ void main() {
         throwsA(isA<PlatformException>()),
       );
       await expectLater(plugin.isSystemApp('com.example.app1'), throwsA(isA<PlatformException>()));
+      await expectLater(
+        plugin.isAppEnabled('com.example.app1'),
+        throwsA(isA<PlatformException>().having((e) => e.code, 'code', 'ERR_QUERY')),
+      );
+      await expectLater(
+        plugin.isAppLaunchable('com.example.app1'),
+        throwsA(isA<PlatformException>().having((e) => e.code, 'code', 'ERR_QUERY')),
+      );
     });
   });
 
@@ -391,6 +432,14 @@ Object? _handleMethodCall(MethodCall call) {
       final packageName = args!['packageName']! as String;
       if (packageName == 'com.nonexistent.app') return null;
       return packageName == 'com.android.settings';
+
+    case 'isAppEnabled':
+      final packageName = args!['packageName']! as String;
+      if (packageName == 'com.nonexistent.app') return null;
+      return packageName != 'com.example.disabled';
+
+    case 'isAppLaunchable':
+      return args!['packageName'] == 'com.example.app1';
 
     case 'getRequestedPermissions':
       final packageName = args!['packageName']! as String;

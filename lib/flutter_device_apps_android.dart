@@ -43,11 +43,13 @@ class FlutterDeviceAppsAndroid extends FlutterDeviceAppsPlatform {
     bool includeSystem = false,
     bool onlyLaunchable = true,
     bool includeIcons = false,
+    String? packageNamePrefix,
   }) async {
     final List raw = await _mch.invokeMethod('listApps', {
       'includeSystem': includeSystem,
       'onlyLaunchable': onlyLaunchable,
       'includeIcons': includeIcons,
+      'packageNamePrefix': packageNamePrefix,
     });
     return raw.cast<Map>().map((m) => AppInfo.fromMap(Map<String, Object?>.from(m))).toList();
   }
@@ -76,6 +78,18 @@ class FlutterDeviceAppsAndroid extends FlutterDeviceAppsPlatform {
   @override
   Future<bool?> isSystemApp(String packageName) =>
       _mch.invokeMethod<bool>('isSystemApp', {'packageName': packageName});
+
+  @override
+  Future<bool?> isAppEnabled(String packageName) =>
+      _mch.invokeMethod<bool>('isAppEnabled', {'packageName': packageName});
+
+  @override
+  Future<bool> isAppLaunchable(String packageName) async {
+    final bool? launchable = await _mch.invokeMethod<bool>('isAppLaunchable', {
+      'packageName': packageName,
+    });
+    return launchable ?? false;
+  }
 
   @override
   Future<List<String>?> getRequestedPermissions(String packageName) async {

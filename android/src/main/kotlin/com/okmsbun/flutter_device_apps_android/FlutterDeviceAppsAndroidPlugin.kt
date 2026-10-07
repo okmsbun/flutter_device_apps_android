@@ -78,9 +78,10 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
         val includeSystem = call.argument<Boolean>("includeSystem") ?: false
         val onlyLaunchable = call.argument<Boolean>("onlyLaunchable") ?: true
         val includeIcons = call.argument<Boolean>("includeIcons") ?: false
+        val packageNamePrefix = call.argument<String>("packageNamePrefix")
         scope.launch {
           try {
-            val apps = listAppsInternal(includeSystem, onlyLaunchable, includeIcons)
+            val apps = listAppsInternal(includeSystem, onlyLaunchable, includeIcons, packageNamePrefix)
             mainHandler.post { result.success(apps) }
           } catch (e: Exception) {
             mainHandler.post { result.error("ERR_LIST", e.message, null) }
@@ -114,7 +115,7 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
           }
         }
       }
-      "isAppInstalled", "isSystemApp" -> {
+      "isAppInstalled", "isSystemApp", "isAppEnabled" -> {
         val pkg = call.argument<String>("packageName")
         if (pkg.isNullOrBlank()) return result.error("ARG", "packageName required", null)
         try {
@@ -125,11 +126,23 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
             pm.getApplicationInfo(pkg, 0)
           }
           result.success(
-            if (call.method == "isAppInstalled") true
-            else (aInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+            when (call.method) {
+              "isAppInstalled" -> true
+              "isSystemApp" -> (aInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+              else -> aInfo.enabled
+            }
           )
         } catch (_: PackageManager.NameNotFoundException) {
           result.success(if (call.method == "isAppInstalled") false else null)
+        } catch (e: Exception) {
+          result.error("ERR_QUERY", e.message, null)
+        }
+      }
+      "isAppLaunchable" -> {
+        val pkg = call.argument<String>("packageName")
+        if (pkg.isNullOrBlank()) return result.error("ARG", "packageName required", null)
+        try {
+          result.success(pm.getLaunchIntentForPackage(pkg) != null)
         } catch (e: Exception) {
           result.error("ERR_QUERY", e.message, null)
         }
@@ -328,7 +341,12 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
   }
 
   // ---- Helpers ----
-  private fun listAppsInternal(includeSystem: Boolean, onlyLaunchable: Boolean, includeIcons: Boolean): List<Map<String, Any?>> {
+  private fun listAppsInternal(
+    includeSystem: Boolean,
+    onlyLaunchable: Boolean,
+    includeIcons: Boolean,
+    packageNamePrefix: String?
+  ): List<Map<String, Any?>> {
     val packageNames: Set<String> = if (onlyLaunchable) {
       val intent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
       pm.queryIntentActivities(intent, 0).map { it.activityInfo.packageName }.toSet()
@@ -336,6 +354,7 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
       pm.getInstalledApplications(0).map { it.packageName }.toSet()
     }
     return packageNames.mapNotNull { pkg ->
+      if (!packageNamePrefix.isNullOrEmpty() && !pkg.startsWith(packageNamePrefix)) return@mapNotNull null
       try {
         val m = getAppMap(pkg, includeIcons)
         if (m == null) null
