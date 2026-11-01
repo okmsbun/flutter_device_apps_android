@@ -102,6 +102,26 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
           }
         }
       }
+      "getApps" -> {
+        val packageNames = (call.arguments as? Map<*, *>)?.get("packageNames") as? List<*>
+        if (packageNames == null || packageNames.any { it !is String }) {
+          return result.error("ARG", "packageNames must be a list of strings", null)
+        }
+        val includeIcons = call.argument<Boolean>("includeIcons") ?: false
+        scope.launch {
+          try {
+            val apps = packageNames.asSequence()
+              .filterIsInstance<String>()
+              .filter { it.isNotBlank() }
+              .distinct()
+              .mapNotNull { getAppMap(it, includeIcons) }
+              .toList()
+            mainHandler.post { result.success(apps) }
+          } catch (e: Exception) {
+            mainHandler.post { result.error("ERR_GET_APPS", e.message, null) }
+          }
+        }
+      }
       "getAppIcon" -> {
         val pkg = call.argument<String>("packageName")
         if (pkg.isNullOrBlank()) return result.error("ARG", "packageName required", null)

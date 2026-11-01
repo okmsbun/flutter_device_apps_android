@@ -79,6 +79,15 @@ class FlutterDeviceAppsAndroid extends FlutterDeviceAppsPlatform {
   }
 
   @override
+  Future<List<AppInfo>> getApps(List<String> packageNames, {bool includeIcons = false}) async {
+    final List raw = await _mch.invokeMethod('getApps', {
+      'packageNames': packageNames,
+      'includeIcons': includeIcons,
+    });
+    return raw.cast<Map>().map((m) => AppInfo.fromMap(Map<String, Object?>.from(m))).toList();
+  }
+
+  @override
   Future<Uint8List?> getAppIcon(String packageName) =>
       _mch.invokeMethod<Uint8List>('getAppIcon', {'packageName': packageName});
 

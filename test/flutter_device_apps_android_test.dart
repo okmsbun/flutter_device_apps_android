@@ -158,6 +158,71 @@ void main() {
     });
   });
 
+  group('getApps', () {
+    test('sends one native request with the supplied names and default options', () async {
+      final names = [
+        'com.example.app2',
+        'com.example.missing',
+        'com.example.app1',
+        'com.example.app2',
+      ];
+      final List<AppInfo> apps = await plugin.getApps(names);
+      expect(methodCalls, hasLength(1));
+      expect(methodCalls.single.method, 'getApps');
+      expect(methodCalls.single.arguments, {'packageNames': names, 'includeIcons': false});
+      expect(apps.map((app) => app.packageName), ['com.example.app2', 'com.example.app1']);
+      expect(apps.first.uid, 10124);
+    });
+
+    test('forwards includeIcons and decodes the native response', () async {
+      final bytes = Uint8List.fromList([137, 80, 78, 71]);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('flutter_device_apps/methods'),
+        (MethodCall call) async {
+          methodCalls.add(call);
+          return [
+            {..._createAppMap('com.example.app2', 'App 2'), 'iconBytes': bytes},
+            _createAppMap('com.example.app1', 'App 1'),
+          ];
+        },
+      );
+      final List<AppInfo> apps = await plugin.getApps([
+        'com.example.app2',
+        'com.example.app1',
+      ], includeIcons: true);
+      expect(methodCalls.single.arguments, {
+        'packageNames': ['com.example.app2', 'com.example.app1'],
+        'includeIcons': true,
+      });
+      expect(apps.first.iconBytes, bytes);
+      expect(apps.last.iconBytes, isNull);
+      expect(apps.last.appName, 'App 1');
+    });
+
+    test('returns an empty native result for an empty input', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('flutter_device_apps/methods'),
+        (MethodCall call) async {
+          methodCalls.add(call);
+          return <Map>[];
+        },
+      );
+      expect(await plugin.getApps([]), isEmpty);
+      expect(methodCalls.single.arguments, {'packageNames': <String>[], 'includeIcons': false});
+    });
+
+    test('propagates native errors', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('flutter_device_apps/methods'),
+        (MethodCall call) async => throw PlatformException(code: 'ERR_GET_APPS'),
+      );
+      await expectLater(
+        plugin.getApps(['com.example.app1']),
+        throwsA(isA<PlatformException>().having((error) => error.code, 'code', 'ERR_GET_APPS')),
+      );
+    });
+  });
+
   group('getAppIcon', () {
     test('returns typed icon bytes without requesting metadata', () async {
       final Uint8List? bytes = await plugin.getAppIcon('com.example.app1');
@@ -380,6 +445,12 @@ Object? _handleMethodCall(MethodCall call) {
       return [
         _createAppMap('com.example.app1', 'App 1'),
         _createAppMap('com.example.app2', 'App 2'),
+      ];
+
+    case 'getApps':
+      return [
+        _createAppMap('com.example.app2', 'App 2'),
+        _createAppMap('com.example.app1', 'App 1'),
       ];
 
     case 'getApp':
