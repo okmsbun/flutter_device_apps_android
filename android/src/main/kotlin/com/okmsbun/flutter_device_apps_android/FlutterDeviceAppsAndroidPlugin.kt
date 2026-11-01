@@ -79,9 +79,10 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
         val onlyLaunchable = call.argument<Boolean>("onlyLaunchable") ?: true
         val includeIcons = call.argument<Boolean>("includeIcons") ?: false
         val packageNamePrefix = call.argument<String>("packageNamePrefix")
+        val packageNameContains = call.argument<String>("packageNameContains")
         scope.launch {
           try {
-            val apps = listAppsInternal(includeSystem, onlyLaunchable, includeIcons, packageNamePrefix)
+            val apps = listAppsInternal(includeSystem, onlyLaunchable, includeIcons, packageNamePrefix, packageNameContains)
             mainHandler.post { result.success(apps) }
           } catch (e: Exception) {
             mainHandler.post { result.error("ERR_LIST", e.message, null) }
@@ -285,26 +286,6 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
           result.error("ERR_INSTALL_SOURCE", e.message, null)
         }
       }
-      "getInstallerStore" -> {
-        val pkg = call.argument<String>("packageName")
-        if (pkg == null) {
-          result.error("ARG", "packageName required", null)
-          return
-        }
-        try {
-          val installer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            pm.getInstallSourceInfo(pkg).installingPackageName
-          } else {
-            @Suppress("DEPRECATION")
-            pm.getInstallerPackageName(pkg)
-          }
-          result.success(installer)
-        } catch (e: Exception) {
-          result.error("ERR_INSTALLER", e.message, null)
-        }
-      }
-
-
       else -> result.notImplemented()
     }
   }
@@ -345,7 +326,8 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
     includeSystem: Boolean,
     onlyLaunchable: Boolean,
     includeIcons: Boolean,
-    packageNamePrefix: String?
+    packageNamePrefix: String?,
+    packageNameContains: String?
   ): List<Map<String, Any?>> {
     val packageNames: Set<String> = if (onlyLaunchable) {
       val intent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
@@ -355,6 +337,7 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
     }
     return packageNames.mapNotNull { pkg ->
       if (!packageNamePrefix.isNullOrEmpty() && !pkg.startsWith(packageNamePrefix)) return@mapNotNull null
+      if (!packageNameContains.isNullOrEmpty() && !pkg.contains(packageNameContains)) return@mapNotNull null
       try {
         val m = getAppMap(pkg, includeIcons)
         if (m == null) null

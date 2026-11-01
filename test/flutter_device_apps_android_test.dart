@@ -47,6 +47,7 @@ void main() {
         'onlyLaunchable': true,
         'includeIcons': false,
         'packageNamePrefix': null,
+        'packageNameContains': null,
       });
     });
 
@@ -55,7 +56,8 @@ void main() {
         includeSystem: true,
         onlyLaunchable: false,
         includeIcons: true,
-        packageNamePrefix: 'com.example.',
+        packageNamePrefix: 'com.',
+        packageNameContains: 'example',
       );
 
       expect(methodCalls, hasLength(1));
@@ -63,17 +65,30 @@ void main() {
         'includeSystem': true,
         'onlyLaunchable': false,
         'includeIcons': true,
-        'packageNamePrefix': 'com.example.',
+        'packageNamePrefix': 'com.',
+        'packageNameContains': 'example',
       });
     });
 
-    test('preserves an empty prefix when calling native code', () async {
-      await plugin.listApps(packageNamePrefix: '');
+    test('preserves empty package name filters when calling native code', () async {
+      await plugin.listApps(packageNamePrefix: '', packageNameContains: '');
       expect(methodCalls.first.arguments, {
         'includeSystem': false,
         'onlyLaunchable': true,
         'includeIcons': false,
         'packageNamePrefix': '',
+        'packageNameContains': '',
+      });
+    });
+
+    test('supports a prefix without a substring', () async {
+      await plugin.listApps(packageNamePrefix: 'com.example.');
+      expect(methodCalls.single.arguments, {
+        'includeSystem': false,
+        'onlyLaunchable': true,
+        'includeIcons': false,
+        'packageNamePrefix': 'com.example.',
+        'packageNameContains': null,
       });
     });
 
@@ -354,32 +369,6 @@ void main() {
       );
     });
   });
-
-  group('getInstallerStore', () {
-    test('calls method channel with package name', () async {
-      // Exercise the deprecated API to verify backwards compatibility.
-      // ignore: deprecated_member_use_from_same_package
-      await plugin.getInstallerStore('com.example.app1');
-
-      expect(methodCalls, hasLength(1));
-      expect(methodCalls.first.method, 'getInstallerStore');
-      expect(methodCalls.first.arguments, {'packageName': 'com.example.app1'});
-    });
-
-    test('returns store package name', () async {
-      // Exercise the deprecated API to verify backwards compatibility.
-      // ignore: deprecated_member_use_from_same_package
-      final String? store = await plugin.getInstallerStore('com.example.app1');
-      expect(store, 'com.android.vending');
-    });
-
-    test('returns null for sideloaded app', () async {
-      // Exercise the deprecated API to verify backwards compatibility.
-      // ignore: deprecated_member_use_from_same_package
-      final String? store = await plugin.getInstallerStore('com.sideloaded.app');
-      expect(store, isNull);
-    });
-  });
 }
 
 /// Mock handler for method calls
@@ -444,11 +433,6 @@ Object? _handleMethodCall(MethodCall call) {
         'packageSource': 2,
         'updateOwnerPackageName': 'com.example.owner',
       };
-
-    case 'getInstallerStore':
-      final packageName = args!['packageName']! as String;
-      if (packageName == 'com.sideloaded.app') return null;
-      return 'com.android.vending';
 
     case 'startAppChangeStream':
     case 'stopAppChangeStream':
