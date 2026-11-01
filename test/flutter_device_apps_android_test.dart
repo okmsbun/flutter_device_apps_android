@@ -47,6 +47,7 @@ void main() {
         'onlyLaunchable': true,
         'includeIcons': false,
         'packageNamePrefix': null,
+        'packageNameContains': null,
       });
     });
 
@@ -55,7 +56,8 @@ void main() {
         includeSystem: true,
         onlyLaunchable: false,
         includeIcons: true,
-        packageNamePrefix: 'com.example.',
+        packageNamePrefix: 'com.',
+        packageNameContains: 'example',
       );
 
       expect(methodCalls, hasLength(1));
@@ -63,17 +65,30 @@ void main() {
         'includeSystem': true,
         'onlyLaunchable': false,
         'includeIcons': true,
-        'packageNamePrefix': 'com.example.',
+        'packageNamePrefix': 'com.',
+        'packageNameContains': 'example',
       });
     });
 
-    test('preserves an empty prefix when calling native code', () async {
-      await plugin.listApps(packageNamePrefix: '');
+    test('preserves empty package name filters when calling native code', () async {
+      await plugin.listApps(packageNamePrefix: '', packageNameContains: '');
       expect(methodCalls.first.arguments, {
         'includeSystem': false,
         'onlyLaunchable': true,
         'includeIcons': false,
         'packageNamePrefix': '',
+        'packageNameContains': '',
+      });
+    });
+
+    test('supports a prefix without a substring', () async {
+      await plugin.listApps(packageNamePrefix: 'com.example.');
+      expect(methodCalls.single.arguments, {
+        'includeSystem': false,
+        'onlyLaunchable': true,
+        'includeIcons': false,
+        'packageNamePrefix': 'com.example.',
+        'packageNameContains': null,
       });
     });
 
@@ -140,6 +155,102 @@ void main() {
     test('returns null when app does not exist', () async {
       final AppInfo? app = await plugin.getApp('com.nonexistent.app');
       expect(app, isNull);
+    });
+  });
+
+  group('getApps', () {
+    test('sends one native request with the supplied names and default options', () async {
+      final names = [
+        'com.example.app2',
+        'com.example.missing',
+        'com.example.app1',
+        'com.example.app2',
+      ];
+      final List<AppInfo> apps = await plugin.getApps(names);
+      expect(methodCalls, hasLength(1));
+      expect(methodCalls.single.method, 'getApps');
+      expect(methodCalls.single.arguments, {'packageNames': names, 'includeIcons': false});
+      expect(apps.map((app) => app.packageName), ['com.example.app2', 'com.example.app1']);
+      expect(apps.first.uid, 10124);
+    });
+
+    test('forwards includeIcons and decodes the native response', () async {
+      final bytes = Uint8List.fromList([137, 80, 78, 71]);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('flutter_device_apps/methods'),
+        (MethodCall call) async {
+          methodCalls.add(call);
+          return [
+            {..._createAppMap('com.example.app2', 'App 2'), 'iconBytes': bytes},
+            _createAppMap('com.example.app1', 'App 1'),
+          ];
+        },
+      );
+      final List<AppInfo> apps = await plugin.getApps([
+        'com.example.app2',
+        'com.example.app1',
+      ], includeIcons: true);
+      expect(methodCalls.single.arguments, {
+        'packageNames': ['com.example.app2', 'com.example.app1'],
+        'includeIcons': true,
+      });
+      expect(apps.first.iconBytes, bytes);
+      expect(apps.last.iconBytes, isNull);
+      expect(apps.last.appName, 'App 1');
+    });
+
+    test('returns an empty native result for an empty input', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('flutter_device_apps/methods'),
+        (MethodCall call) async {
+          methodCalls.add(call);
+          return <Map>[];
+        },
+      );
+      expect(await plugin.getApps([]), isEmpty);
+      expect(methodCalls.single.arguments, {'packageNames': <String>[], 'includeIcons': false});
+    });
+
+    test('propagates native errors', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('flutter_device_apps/methods'),
+        (MethodCall call) async => throw PlatformException(code: 'ERR_GET_APPS'),
+      );
+      await expectLater(
+        plugin.getApps(['com.example.app1']),
+        throwsA(isA<PlatformException>().having((error) => error.code, 'code', 'ERR_GET_APPS')),
+      );
+    });
+  });
+
+  group('detectAppFrameworks', () {
+    test('decodes all native identifiers and forwards the exact package name', () async {
+      final List<AppFramework> frameworks = await plugin.detectAppFrameworks('com.example.app');
+      expect(frameworks, AppFramework.values);
+      expect(methodCalls, hasLength(1));
+      expect(methodCalls.single.method, 'detectAppFrameworks');
+      expect(methodCalls.single.arguments, {'packageName': 'com.example.app'});
+    });
+
+    test('preserves a successful empty result', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('flutter_device_apps/methods'),
+        (MethodCall call) async => <String>[],
+      );
+      expect(await plugin.detectAppFrameworks('com.example.app'), isEmpty);
+    });
+
+    test('does not turn argument, package, or scan failures into an empty result', () async {
+      for (final code in ['ARG', 'APP_NOT_FOUND', 'ERR_FRAMEWORK_SCAN']) {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+          const MethodChannel('flutter_device_apps/methods'),
+          (MethodCall call) async => throw PlatformException(code: code),
+        );
+        await expectLater(
+          plugin.detectAppFrameworks('com.example.app'),
+          throwsA(isA<PlatformException>().having((error) => error.code, 'code', code)),
+        );
+      }
     });
   });
 
@@ -354,32 +465,6 @@ void main() {
       );
     });
   });
-
-  group('getInstallerStore', () {
-    test('calls method channel with package name', () async {
-      // Exercise the deprecated API to verify backwards compatibility.
-      // ignore: deprecated_member_use_from_same_package
-      await plugin.getInstallerStore('com.example.app1');
-
-      expect(methodCalls, hasLength(1));
-      expect(methodCalls.first.method, 'getInstallerStore');
-      expect(methodCalls.first.arguments, {'packageName': 'com.example.app1'});
-    });
-
-    test('returns store package name', () async {
-      // Exercise the deprecated API to verify backwards compatibility.
-      // ignore: deprecated_member_use_from_same_package
-      final String? store = await plugin.getInstallerStore('com.example.app1');
-      expect(store, 'com.android.vending');
-    });
-
-    test('returns null for sideloaded app', () async {
-      // Exercise the deprecated API to verify backwards compatibility.
-      // ignore: deprecated_member_use_from_same_package
-      final String? store = await plugin.getInstallerStore('com.sideloaded.app');
-      expect(store, isNull);
-    });
-  });
 }
 
 /// Mock handler for method calls
@@ -392,6 +477,15 @@ Object? _handleMethodCall(MethodCall call) {
         _createAppMap('com.example.app1', 'App 1'),
         _createAppMap('com.example.app2', 'App 2'),
       ];
+
+    case 'getApps':
+      return [
+        _createAppMap('com.example.app2', 'App 2'),
+        _createAppMap('com.example.app1', 'App 1'),
+      ];
+
+    case 'detectAppFrameworks':
+      return ['flutter', 'reactNative', 'unity', 'unrealEngine', 'godot', 'dotnetAndroid'];
 
     case 'getApp':
       final packageName = args!['packageName']! as String;
@@ -444,11 +538,6 @@ Object? _handleMethodCall(MethodCall call) {
         'packageSource': 2,
         'updateOwnerPackageName': 'com.example.owner',
       };
-
-    case 'getInstallerStore':
-      final packageName = args!['packageName']! as String;
-      if (packageName == 'com.sideloaded.app') return null;
-      return 'com.android.vending';
 
     case 'startAppChangeStream':
     case 'stopAppChangeStream':

@@ -1,3 +1,11 @@
+## 1.1.0
+
+- **BREAKING**: Removed `getInstallerStore`; use `getInstallSourceInfo`.
+- Added native batch lookups with `getApps`.
+- Added `detectAppFrameworks` for base and split APK scans.
+- Added `packageNameContains`, combined with `packageNamePrefix` using AND.
+- Expanded Dart and Kotlin tests.
+
 ## 1.0.0
 
 - **BREAKING**: Raised the minimum requirements to Dart 3.12.0 and Flutter 3.44.0.
