@@ -57,12 +57,14 @@ class FlutterDeviceAppsAndroid extends FlutterDeviceAppsPlatform {
     bool onlyLaunchable = true,
     bool includeIcons = false,
     String? packageNamePrefix,
+    String? packageNameContains,
   }) async {
     final List raw = await _mch.invokeMethod('listApps', {
       'includeSystem': includeSystem,
       'onlyLaunchable': onlyLaunchable,
       'includeIcons': includeIcons,
       'packageNamePrefix': packageNamePrefix,
+      'packageNameContains': packageNameContains,
     });
     return raw.cast<Map>().map((m) => AppInfo.fromMap(Map<String, Object?>.from(m))).toList();
   }
@@ -74,6 +76,21 @@ class FlutterDeviceAppsAndroid extends FlutterDeviceAppsPlatform {
       'includeIcon': includeIcon,
     });
     return m == null ? null : AppInfo.fromMap(Map<String, Object?>.from(m));
+  }
+
+  @override
+  Future<List<AppInfo>> getApps(List<String> packageNames, {bool includeIcons = false}) async {
+    final List raw = await _mch.invokeMethod('getApps', {
+      'packageNames': packageNames,
+      'includeIcons': includeIcons,
+    });
+    return raw.cast<Map>().map((m) => AppInfo.fromMap(Map<String, Object?>.from(m))).toList();
+  }
+
+  @override
+  Future<List<AppFramework>> detectAppFrameworks(String packageName) async {
+    final List raw = await _mch.invokeMethod('detectAppFrameworks', {'packageName': packageName});
+    return raw.cast<String>().map(AppFramework.values.byName).toList();
   }
 
   @override
@@ -134,15 +151,5 @@ class FlutterDeviceAppsAndroid extends FlutterDeviceAppsPlatform {
   Future<AppInstallSourceInfo?> getInstallSourceInfo(String packageName) async {
     final Map? m = await _mch.invokeMethod('getInstallSourceInfo', {'packageName': packageName});
     return m == null ? null : AppInstallSourceInfo.fromMap(Map<String, Object?>.from(m));
-  }
-
-  @override
-  // Newly deprecated; retain the method for backwards compatibility.
-  @Deprecated('Use getInstallSourceInfo() and its installingPackageName instead.')
-  Future<String?> getInstallerStore(String packageName) async {
-    final String? store = await _mch.invokeMethod('getInstallerStore', {
-      'packageName': packageName,
-    });
-    return store;
   }
 }

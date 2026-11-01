@@ -19,7 +19,9 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import org.junit.Before
 import org.junit.Assert.*
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.mockito.Mockito
 import org.mockito.Mockito.mock
@@ -30,6 +32,9 @@ import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.io.File
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /**
  * Unit tests for FlutterDeviceAppsAndroidPlugin.
@@ -40,6 +45,9 @@ import java.util.concurrent.TimeUnit
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE)
 internal class FlutterDeviceAppsAndroidPluginTest {
+
+  @get:Rule
+  val temporaryFolder = TemporaryFolder()
 
   private lateinit var plugin: TestableFlutterDeviceAppsAndroidPlugin
 
@@ -169,17 +177,318 @@ internal class FlutterDeviceAppsAndroidPluginTest {
     }
   }
 
-  // ---- listApps package prefix ----
+  // ---- detectAppFrameworks ----
   @Test
   @Config(sdk = [28, 33])
   @Suppress("DEPRECATION")
-  fun listApps_filtersPrefixBeforeLoadingMetadataAndIconsWithExistingOptions() {
+  fun detectAppFrameworks_readsBaseAndSplitsWithoutLoadingAppMetadata() {
+    val base = frameworkApk("base.apk", "lib/arm64-v8a/libunity.so")
+    val split = frameworkApk("split.apk", "lib/arm64-v8a/libflutter.so", "lib/x86/libunity.so")
+    val info = ApplicationInfo().apply {
+      packageName = "com.example.app"
+      sourceDir = base.path
+      splitSourceDirs = arrayOf(split.path)
+    }
+    val packageManager = frameworkPackageManager(info)
+    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), packageManager)
+    val result = queryMethod(testPlugin, "detectAppFrameworks", mapOf("packageName" to info.packageName))
+    assertNull(result.errorCode)
+    assertEquals(listOf("flutter", "unity"), result.value)
+    if (android.os.Build.VERSION.SDK_INT >= 33) {
+      verify(packageManager).getApplicationInfo(Mockito.eq(info.packageName), Mockito.any(PackageManager.ApplicationInfoFlags::class.java))
+    } else {
+      verify(packageManager).getApplicationInfo(info.packageName, 0)
+    }
+    Mockito.verifyNoMoreInteractions(packageManager)
+  }
+
+  @Test
+  fun detectAppFrameworks_returnsEmptyForASuccessfulScanWithoutMatches() {
+    val base = frameworkApk("base.apk", "classes.dex", "assets/libflutter.so")
+    val info = ApplicationInfo().apply {
+      packageName = "com.example.app"
+      sourceDir = base.path
+    }
+    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), frameworkPackageManager(info))
+    val result = queryMethod(testPlugin, "detectAppFrameworks", mapOf("packageName" to info.packageName))
+    assertNull(result.errorCode)
+    assertEquals(emptyList<String>(), result.value)
+  }
+
+  @Test
+  fun detectAppFrameworks_rejectsMissingBlankOrNonStringNames() {
+    val packageManager = mock(PackageManager::class.java)
+    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), packageManager)
+    for (args in listOf(null, emptyMap<String, Any?>(), mapOf("packageName" to ""), mapOf("packageName" to " "), mapOf("packageName" to 1))) {
+      val result = createMockResult()
+      testPlugin.onMethodCall(MethodCall("detectAppFrameworks", args), result)
+      verify(result).error(Mockito.eq("ARG"), Mockito.eq("packageName required"), Mockito.isNull())
+    }
+    Mockito.verifyNoInteractions(packageManager)
+  }
+
+  @Test
+  @Config(sdk = [28, 33])
+  @Suppress("DEPRECATION")
+  fun detectAppFrameworks_reportsMissingOrHiddenPackagesAsErrors() {
+    val packageManager = mock(PackageManager::class.java)
+    if (android.os.Build.VERSION.SDK_INT >= 33) {
+      Mockito.`when`(packageManager.getApplicationInfo(Mockito.eq("com.missing.app"), Mockito.any(PackageManager.ApplicationInfoFlags::class.java)))
+        .thenThrow(PackageManager.NameNotFoundException("missing"))
+    } else {
+      Mockito.`when`(packageManager.getApplicationInfo("com.missing.app", 0))
+        .thenThrow(PackageManager.NameNotFoundException("missing"))
+    }
+    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), packageManager)
+    val result = queryMethod(testPlugin, "detectAppFrameworks", mapOf("packageName" to "com.missing.app"))
+    assertEquals("APP_NOT_FOUND", result.errorCode)
+    assertNull(result.value)
+  }
+
+  @Test
+  fun detectAppFrameworks_doesNotReturnPartialMatchesWhenASplitCannotBeRead() {
+    val base = frameworkApk("base.apk", "lib/arm64-v8a/libflutter.so")
+    val missing = File(temporaryFolder.root, "missing.apk")
+    val corrupt = temporaryFolder.newFile("corrupt.apk").apply { writeText("not an APK") }
+    val info = ApplicationInfo().apply {
+      packageName = "com.example.app"
+      sourceDir = base.path
+    }
+    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), frameworkPackageManager(info))
+    for (failed in listOf(missing, corrupt)) {
+      info.splitSourceDirs = arrayOf(failed.path)
+      val result = queryMethod(testPlugin, "detectAppFrameworks", mapOf("packageName" to info.packageName))
+      assertEquals("ERR_FRAMEWORK_SCAN", result.errorCode)
+      assertNull(result.value)
+    }
+  }
+
+  @Test
+  fun detectAppFrameworks_reportsUnavailableBaseApkPathsAsErrors() {
+    val info = ApplicationInfo().apply { packageName = "com.example.app" }
+    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), frameworkPackageManager(info))
+    val result = queryMethod(testPlugin, "detectAppFrameworks", mapOf("packageName" to info.packageName))
+    assertEquals("ERR_FRAMEWORK_SCAN", result.errorCode)
+    assertNull(result.value)
+  }
+
+  @Test
+  @Config(sdk = [28, 33])
+  @Suppress("DEPRECATION")
+  fun detectAppFrameworks_reportsAccessFailuresInsteadOfAnEmptyResult() {
+    val packageManager = mock(PackageManager::class.java)
+    if (android.os.Build.VERSION.SDK_INT >= 33) {
+      Mockito.`when`(packageManager.getApplicationInfo(Mockito.eq("com.denied.app"), Mockito.any(PackageManager.ApplicationInfoFlags::class.java)))
+        .thenThrow(SecurityException("denied"))
+    } else {
+      Mockito.`when`(packageManager.getApplicationInfo("com.denied.app", 0))
+        .thenThrow(SecurityException("denied"))
+    }
+    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), packageManager)
+    val result = queryMethod(testPlugin, "detectAppFrameworks", mapOf("packageName" to "com.denied.app"))
+    assertEquals("ERR_FRAMEWORK_SCAN", result.errorCode)
+    assertNull(result.value)
+  }
+
+  @Suppress("DEPRECATION")
+  private fun frameworkPackageManager(info: ApplicationInfo): PackageManager {
+    val packageManager = mock(PackageManager::class.java)
+    if (android.os.Build.VERSION.SDK_INT >= 33) {
+      Mockito.`when`(packageManager.getApplicationInfo(Mockito.eq(info.packageName), Mockito.any(PackageManager.ApplicationInfoFlags::class.java)))
+        .thenReturn(info)
+    } else {
+      Mockito.`when`(packageManager.getApplicationInfo(info.packageName, 0)).thenReturn(info)
+    }
+    return packageManager
+  }
+
+  private fun frameworkApk(name: String, vararg entries: String): File = temporaryFolder.newFile(name).also { file ->
+    ZipOutputStream(file.outputStream()).use { output ->
+      for (entry in entries) {
+        output.putNextEntry(ZipEntry(entry))
+        output.write(byteArrayOf(0))
+        output.closeEntry()
+      }
+    }
+  }
+
+  // ---- getApps ----
+  @Test
+  @Config(sdk = [28, 33])
+  @Suppress("DEPRECATION")
+  fun getApps_queriesOnlyRequestedPackagesOnceInInputOrderWithIcons() {
+    val user = createListPackage("com.example.user").apply {
+      checkNotNull(applicationInfo).enabled = false
+    }
+    val system = createListPackage("com.android.system", ApplicationInfo.FLAG_SYSTEM)
+    val unrequested = createListPackage("org.other.app")
+    val packageManager = mockListPackageManager(listOf(user, system, unrequested))
+    val missing = "com.example.missing"
+    if (android.os.Build.VERSION.SDK_INT >= 33) {
+      Mockito.`when`(packageManager.getPackageInfo(Mockito.eq(missing), Mockito.any(PackageManager.PackageInfoFlags::class.java)))
+        .thenThrow(PackageManager.NameNotFoundException(missing))
+    } else {
+      Mockito.`when`(packageManager.getPackageInfo(missing, 0))
+        .thenThrow(PackageManager.NameNotFoundException(missing))
+    }
+    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), packageManager)
+    val result = queryMethod(testPlugin, "getApps", mapOf(
+      "packageNames" to listOf(system.packageName, missing, user.packageName, system.packageName, "", " "),
+      "includeIcons" to true
+    ))
+    assertNull(result.errorCode)
+    val apps = (result.value as List<*>).map { it as Map<*, *> }
+    assertEquals(listOf(system.packageName, user.packageName), apps.map { it["packageName"] })
+    assertEquals(true, apps[0]["isSystem"])
+    assertEquals(false, apps[1]["enabled"])
+    for (app in apps) {
+      val bytes = app["iconBytes"] as ByteArray
+      assertNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size))
+    }
+    for (pkg in listOf(system.packageName, missing, user.packageName)) {
+      if (android.os.Build.VERSION.SDK_INT >= 33) {
+        verify(packageManager).getPackageInfo(Mockito.eq(pkg), Mockito.any(PackageManager.PackageInfoFlags::class.java))
+      } else {
+        verify(packageManager).getPackageInfo(pkg, 0)
+      }
+    }
+    for (info in listOf(system, user)) {
+      verify(packageManager).getApplicationIcon(checkNotNull(info.applicationInfo))
+    }
+    if (android.os.Build.VERSION.SDK_INT >= 33) {
+      verify(packageManager, Mockito.never()).getPackageInfo(Mockito.eq(unrequested.packageName), Mockito.any(PackageManager.PackageInfoFlags::class.java))
+    } else {
+      verify(packageManager, Mockito.never()).getPackageInfo(unrequested.packageName, 0)
+    }
+    verify(packageManager, Mockito.never()).getApplicationIcon(checkNotNull(unrequested.applicationInfo))
+    verify(packageManager, Mockito.never()).getInstalledApplications(0)
+    verify(packageManager, Mockito.never()).queryIntentActivities(Mockito.any(Intent::class.java), Mockito.eq(0))
+    verify(packageManager, Mockito.never()).getLaunchIntentForPackage(Mockito.anyString())
+  }
+
+  @Test
+  @Config(sdk = [28, 33])
+  @Suppress("DEPRECATION")
+  fun getApps_usesExactNamesWithoutTrimmingOrChangingCaseAndDefaultsToNoIcons() {
+    val installed = createListPackage("com.example.user")
+    val packageManager = mockListPackageManager(listOf(installed))
+    val variants = listOf("Com.example.user", " com.example.user", "com.example.user ")
+    for (pkg in variants) {
+      if (android.os.Build.VERSION.SDK_INT >= 33) {
+        Mockito.`when`(packageManager.getPackageInfo(Mockito.eq(pkg), Mockito.any(PackageManager.PackageInfoFlags::class.java)))
+          .thenThrow(PackageManager.NameNotFoundException(pkg))
+      } else {
+        Mockito.`when`(packageManager.getPackageInfo(pkg, 0))
+          .thenThrow(PackageManager.NameNotFoundException(pkg))
+      }
+    }
+    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), packageManager)
+    val result = queryMethod(testPlugin, "getApps", mapOf("packageNames" to variants + installed.packageName))
+    assertNull(result.errorCode)
+    val apps = (result.value as List<*>).map { it as Map<*, *> }
+    assertEquals(listOf(installed.packageName), apps.map { it["packageName"] })
+    assertNull(apps.single()["iconBytes"])
+    for (pkg in variants + installed.packageName) {
+      if (android.os.Build.VERSION.SDK_INT >= 33) {
+        verify(packageManager).getPackageInfo(Mockito.eq(pkg), Mockito.any(PackageManager.PackageInfoFlags::class.java))
+      } else {
+        verify(packageManager).getPackageInfo(pkg, 0)
+      }
+    }
+    verify(packageManager, Mockito.never()).getApplicationIcon(Mockito.any(ApplicationInfo::class.java))
+    verify(packageManager, Mockito.never()).getInstalledApplications(0)
+    verify(packageManager, Mockito.never()).queryIntentActivities(Mockito.any(Intent::class.java), Mockito.eq(0))
+  }
+
+  @Test
+  fun getApps_emptyOrBlankOnlyListsReturnEmptyWithoutQueryingPackages() {
+    val packageManager = mock(PackageManager::class.java)
+    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), packageManager)
+    for (names in listOf(emptyList(), listOf("", " ", "\n", "\t"))) {
+      val result = queryMethod(testPlugin, "getApps", mapOf("packageNames" to names))
+      assertNull(result.errorCode)
+      assertEquals(emptyList<Any>(), result.value)
+    }
+    Mockito.verifyNoInteractions(packageManager)
+  }
+
+  @Test
+  fun getApps_rejectsMissingOrNonStringPackageListsBeforeQueryingPackages() {
+    val packageManager = mock(PackageManager::class.java)
+    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), packageManager)
+    val arguments: List<Any?> = listOf(
+      null,
+      "invalid",
+      emptyMap<String, Any?>(),
+      mapOf("packageNames" to null),
+      mapOf("packageNames" to "com.example.user"),
+      mapOf("packageNames" to listOf(1)),
+      mapOf("packageNames" to listOf("com.example.user", null))
+    )
+    for (args in arguments) {
+      val result = createMockResult()
+      testPlugin.onMethodCall(MethodCall("getApps", args), result)
+      verify(result).error(Mockito.eq("ARG"), Mockito.eq("packageNames must be a list of strings"), Mockito.isNull())
+    }
+    Mockito.verifyNoInteractions(packageManager)
+  }
+
+  // ---- listApps package name filters ----
+  @Test
+  @Config(sdk = [28, 33])
+  fun listApps_matchesPrefixOnlyAtTheStartAndIsCaseSensitive() {
+    val packages = listOf(
+      createListPackage("com.example.user"),
+      createListPackage("com.example.other"),
+      createListPackage("org.com.example.embedded"),
+      createListPackage("Com.example.upper"),
+      createListPackage("com.examples.lookalike")
+    )
+    val packageManager = mockListPackageManager(packages)
+    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), packageManager)
+
+    for (onlyLaunchable in listOf(false, true)) {
+      val apps = queryApps(testPlugin, mapOf(
+        "onlyLaunchable" to onlyLaunchable,
+        "packageNamePrefix" to "com.example."
+      ))
+      assertEquals(packages.take(2).map { it.packageName }, apps.map { it["packageName"] })
+    }
+  }
+
+  @Test
+  @Config(sdk = [28, 33])
+  fun listApps_matchesSubstringAtStartMiddleAndEnd() {
+    val packages = listOf(
+      createListPackage("example.start"),
+      createListPackage("com.example.middle"),
+      createListPackage("com.vendor.example"),
+      createListPackage("com.EXAMPLE.upper"),
+      createListPackage("org.other.app")
+    )
+    val packageManager = mockListPackageManager(packages)
+    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), packageManager)
+
+    for (onlyLaunchable in listOf(false, true)) {
+      val apps = queryApps(testPlugin, mapOf(
+        "onlyLaunchable" to onlyLaunchable,
+        "packageNameContains" to "example"
+      ))
+      assertEquals(packages.take(3).map { it.packageName }, apps.map { it["packageName"] })
+    }
+  }
+
+  @Test
+  @Config(sdk = [28, 33])
+  @Suppress("DEPRECATION")
+  fun listApps_combinesBothFiltersBeforeLoadingMetadataAndIconsWithExistingOptions() {
     val packages = listOf(
       createListPackage("com.example.user"),
       createListPackage("com.example.system", ApplicationInfo.FLAG_SYSTEM),
       createListPackage("com.example.background"),
-      createListPackage("org.other.app"),
-      createListPackage("Com.example.upper")
+      createListPackage("org.example.app"),
+      createListPackage("com.other.app"),
+      createListPackage("com.Example.upper")
     )
     val launcherPackages = packages.filter { it.packageName != "com.example.background" }
     val packageManager = mockListPackageManager(packages, launcherPackages)
@@ -191,7 +500,8 @@ internal class FlutterDeviceAppsAndroidPluginTest {
           "includeSystem" to includeSystem,
           "onlyLaunchable" to onlyLaunchable,
           "includeIcons" to true,
-          "packageNamePrefix" to "com.example."
+          "packageNamePrefix" to "com.",
+          "packageNameContains" to "example"
         ))
         val expected = mutableListOf("com.example.user")
         if (includeSystem) expected.add("com.example.system")
@@ -204,7 +514,7 @@ internal class FlutterDeviceAppsAndroidPluginTest {
       }
     }
 
-    for (ignored in packages.takeLast(2)) {
+    for (ignored in packages.takeLast(3)) {
       if (android.os.Build.VERSION.SDK_INT >= 33) {
         verify(packageManager, Mockito.never()).getPackageInfo(Mockito.eq(ignored.packageName), Mockito.any(PackageManager.PackageInfoFlags::class.java))
       } else {
@@ -220,17 +530,20 @@ internal class FlutterDeviceAppsAndroidPluginTest {
 
   @Test
   @Config(sdk = [28, 33])
-  fun listApps_omittedNullAndEmptyPrefixesPreserveListing() {
+  fun listApps_omittedNullAndEmptyFiltersPreserveListing() {
     val packages = listOf(createListPackage("com.example.user"), createListPackage("org.other.app"))
     val packageManager = mockListPackageManager(packages)
     val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), packageManager)
     val prefixes = listOf(emptyMap(), mapOf("packageNamePrefix" to null), mapOf("packageNamePrefix" to ""))
+    val substrings = listOf(emptyMap(), mapOf("packageNameContains" to null), mapOf("packageNameContains" to ""))
 
     for (onlyLaunchable in listOf(false, true)) {
       for (prefixArguments in prefixes) {
-        val apps = queryApps(testPlugin, mapOf("onlyLaunchable" to onlyLaunchable) + prefixArguments)
-        assertEquals(packages.map { it.packageName }, apps.map { it["packageName"] })
-        assertTrue(apps.all { it["iconBytes"] == null })
+        for (substringArguments in substrings) {
+          val apps = queryApps(testPlugin, mapOf("onlyLaunchable" to onlyLaunchable) + prefixArguments + substringArguments)
+          assertEquals(packages.map { it.packageName }, apps.map { it["packageName"] })
+          assertTrue(apps.all { it["iconBytes"] == null })
+        }
       }
     }
     verify(packageManager, Mockito.never()).getApplicationIcon(Mockito.any(ApplicationInfo::class.java))
@@ -238,23 +551,28 @@ internal class FlutterDeviceAppsAndroidPluginTest {
 
   @Test
   @Config(sdk = [28, 33])
-  fun listApps_unmatchedPrefixesReturnEmptyWithoutLoadingMetadata() {
+  fun listApps_unmatchedFiltersReturnEmptyWithoutLoadingMetadata() {
     val packages = listOf(createListPackage("com.example.user"))
     val packageManager = mockListPackageManager(packages)
     val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), packageManager)
 
+    val filters = listOf(
+      mapOf("packageNamePrefix" to "net.missing."),
+      mapOf("packageNamePrefix" to " com.example."),
+      mapOf("packageNameContains" to "net.missing."),
+      mapOf("packageNameContains" to " com.example.")
+    )
     for (onlyLaunchable in listOf(false, true)) {
-      for (prefix in listOf("net.missing.", " com.example.")) {
+      for (filterArguments in filters) {
         val apps = queryApps(testPlugin, mapOf(
           "onlyLaunchable" to onlyLaunchable,
-          "includeIcons" to true,
-          "packageNamePrefix" to prefix
-        ))
+          "includeIcons" to true
+        ) + filterArguments)
         assertTrue(apps.isEmpty())
       }
     }
-    verify(packageManager, Mockito.times(2)).getInstalledApplications(0)
-    verify(packageManager, Mockito.times(2)).queryIntentActivities(Mockito.any(Intent::class.java), Mockito.eq(0))
+    verify(packageManager, Mockito.times(4)).getInstalledApplications(0)
+    verify(packageManager, Mockito.times(4)).queryIntentActivities(Mockito.any(Intent::class.java), Mockito.eq(0))
     Mockito.verifyNoMoreInteractions(packageManager)
   }
 
@@ -624,62 +942,6 @@ internal class FlutterDeviceAppsAndroidPluginTest {
     val result = createMockResult()
     testPlugin.onMethodCall(MethodCall("getInstallSourceInfo", mapOf("packageName" to "com.example.denied")), result)
     verify(result).error(Mockito.eq("ERR_INSTALL_SOURCE"), Mockito.eq("denied"), Mockito.isNull())
-  }
-
-  // ---- getInstallerStore ----
-  @Test
-  @Config(sdk = [28, 30])
-  @Suppress("DEPRECATION")
-  fun getInstallerStore_preservesLegacyResultsUsingVersionAppropriateApi() {
-    val packageManager = mock(PackageManager::class.java)
-    if (android.os.Build.VERSION.SDK_INT >= 30) {
-      val info = mock(InstallSourceInfo::class.java)
-      Mockito.`when`(info.installingPackageName).thenReturn("com.android.vending", null)
-      Mockito.`when`(packageManager.getInstallSourceInfo("com.example.app")).thenReturn(info)
-    } else {
-      Mockito.`when`(packageManager.getInstallerPackageName("com.example.app"))
-        .thenReturn("com.android.vending", null)
-    }
-    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), packageManager)
-    for (installer in listOf("com.android.vending", null)) {
-      val result = createMockResult()
-      testPlugin.onMethodCall(MethodCall("getInstallerStore", mapOf("packageName" to "com.example.app")), result)
-      verify(result).success(installer)
-    }
-    if (android.os.Build.VERSION.SDK_INT >= 30) {
-      verify(packageManager, Mockito.times(2)).getInstallSourceInfo("com.example.app")
-    } else {
-      verify(packageManager, Mockito.times(2)).getInstallerPackageName("com.example.app")
-    }
-    Mockito.verifyNoMoreInteractions(packageManager)
-  }
-
-  @Test
-  @Config(sdk = [28, 30])
-  @Suppress("DEPRECATION")
-  fun getInstallerStore_preservesErrorsForUnavailablePackages() {
-    val packageManager = mock(PackageManager::class.java)
-    if (android.os.Build.VERSION.SDK_INT >= 30) {
-      Mockito.`when`(packageManager.getInstallSourceInfo("com.example.missing"))
-        .thenThrow(PackageManager.NameNotFoundException("missing"))
-    } else {
-      Mockito.`when`(packageManager.getInstallerPackageName("com.example.missing"))
-        .thenThrow(IllegalArgumentException("missing"))
-    }
-    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), packageManager)
-    val result = createMockResult()
-    testPlugin.onMethodCall(MethodCall("getInstallerStore", mapOf("packageName" to "com.example.missing")), result)
-    verify(result).error(Mockito.eq("ERR_INSTALLER"), Mockito.eq("missing"), Mockito.isNull())
-  }
-
-  @Test
-  fun onMethodCall_getInstallerStore_handlesNullPackageGracefully() {
-    val call = MethodCall("getInstallerStore", null)
-    val mockResult = createMockResult()
-
-    plugin.onMethodCall(call, mockResult)
-
-    verify(mockResult).error(Mockito.eq("ARG"), Mockito.eq("packageName required"), Mockito.isNull())
   }
 
   // ---- Unknown method ----
