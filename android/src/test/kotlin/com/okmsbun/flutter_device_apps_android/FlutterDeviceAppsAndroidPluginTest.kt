@@ -19,7 +19,9 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import org.junit.Before
 import org.junit.Assert.*
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.mockito.Mockito
 import org.mockito.Mockito.mock
@@ -30,6 +32,9 @@ import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.io.File
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /**
  * Unit tests for FlutterDeviceAppsAndroidPlugin.
@@ -40,6 +45,9 @@ import java.util.concurrent.TimeUnit
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE)
 internal class FlutterDeviceAppsAndroidPluginTest {
+
+  @get:Rule
+  val temporaryFolder = TemporaryFolder()
 
   private lateinit var plugin: TestableFlutterDeviceAppsAndroidPlugin
 
@@ -166,6 +174,141 @@ internal class FlutterDeviceAppsAndroidPluginTest {
     override fun notImplemented() {
       errorCode = "NOT_IMPLEMENTED"
       done.countDown()
+    }
+  }
+
+  // ---- detectAppFrameworks ----
+  @Test
+  @Config(sdk = [28, 33])
+  @Suppress("DEPRECATION")
+  fun detectAppFrameworks_readsBaseAndSplitsWithoutLoadingAppMetadata() {
+    val base = frameworkApk("base.apk", "lib/arm64-v8a/libunity.so")
+    val split = frameworkApk("split.apk", "lib/arm64-v8a/libflutter.so", "lib/x86/libunity.so")
+    val info = ApplicationInfo().apply {
+      packageName = "com.example.app"
+      sourceDir = base.path
+      splitSourceDirs = arrayOf(split.path)
+    }
+    val packageManager = frameworkPackageManager(info)
+    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), packageManager)
+    val result = queryMethod(testPlugin, "detectAppFrameworks", mapOf("packageName" to info.packageName))
+    assertNull(result.errorCode)
+    assertEquals(listOf("flutter", "unity"), result.value)
+    if (android.os.Build.VERSION.SDK_INT >= 33) {
+      verify(packageManager).getApplicationInfo(Mockito.eq(info.packageName), Mockito.any(PackageManager.ApplicationInfoFlags::class.java))
+    } else {
+      verify(packageManager).getApplicationInfo(info.packageName, 0)
+    }
+    Mockito.verifyNoMoreInteractions(packageManager)
+  }
+
+  @Test
+  fun detectAppFrameworks_returnsEmptyForASuccessfulScanWithoutMatches() {
+    val base = frameworkApk("base.apk", "classes.dex", "assets/libflutter.so")
+    val info = ApplicationInfo().apply {
+      packageName = "com.example.app"
+      sourceDir = base.path
+    }
+    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), frameworkPackageManager(info))
+    val result = queryMethod(testPlugin, "detectAppFrameworks", mapOf("packageName" to info.packageName))
+    assertNull(result.errorCode)
+    assertEquals(emptyList<String>(), result.value)
+  }
+
+  @Test
+  fun detectAppFrameworks_rejectsMissingBlankOrNonStringNames() {
+    val packageManager = mock(PackageManager::class.java)
+    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), packageManager)
+    for (args in listOf(null, emptyMap<String, Any?>(), mapOf("packageName" to ""), mapOf("packageName" to " "), mapOf("packageName" to 1))) {
+      val result = createMockResult()
+      testPlugin.onMethodCall(MethodCall("detectAppFrameworks", args), result)
+      verify(result).error(Mockito.eq("ARG"), Mockito.eq("packageName required"), Mockito.isNull())
+    }
+    Mockito.verifyNoInteractions(packageManager)
+  }
+
+  @Test
+  @Config(sdk = [28, 33])
+  @Suppress("DEPRECATION")
+  fun detectAppFrameworks_reportsMissingOrHiddenPackagesAsErrors() {
+    val packageManager = mock(PackageManager::class.java)
+    if (android.os.Build.VERSION.SDK_INT >= 33) {
+      Mockito.`when`(packageManager.getApplicationInfo(Mockito.eq("com.missing.app"), Mockito.any(PackageManager.ApplicationInfoFlags::class.java)))
+        .thenThrow(PackageManager.NameNotFoundException("missing"))
+    } else {
+      Mockito.`when`(packageManager.getApplicationInfo("com.missing.app", 0))
+        .thenThrow(PackageManager.NameNotFoundException("missing"))
+    }
+    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), packageManager)
+    val result = queryMethod(testPlugin, "detectAppFrameworks", mapOf("packageName" to "com.missing.app"))
+    assertEquals("APP_NOT_FOUND", result.errorCode)
+    assertNull(result.value)
+  }
+
+  @Test
+  fun detectAppFrameworks_doesNotReturnPartialMatchesWhenASplitCannotBeRead() {
+    val base = frameworkApk("base.apk", "lib/arm64-v8a/libflutter.so")
+    val missing = File(temporaryFolder.root, "missing.apk")
+    val corrupt = temporaryFolder.newFile("corrupt.apk").apply { writeText("not an APK") }
+    val info = ApplicationInfo().apply {
+      packageName = "com.example.app"
+      sourceDir = base.path
+    }
+    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), frameworkPackageManager(info))
+    for (failed in listOf(missing, corrupt)) {
+      info.splitSourceDirs = arrayOf(failed.path)
+      val result = queryMethod(testPlugin, "detectAppFrameworks", mapOf("packageName" to info.packageName))
+      assertEquals("ERR_FRAMEWORK_SCAN", result.errorCode)
+      assertNull(result.value)
+    }
+  }
+
+  @Test
+  fun detectAppFrameworks_reportsUnavailableBaseApkPathsAsErrors() {
+    val info = ApplicationInfo().apply { packageName = "com.example.app" }
+    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), frameworkPackageManager(info))
+    val result = queryMethod(testPlugin, "detectAppFrameworks", mapOf("packageName" to info.packageName))
+    assertEquals("ERR_FRAMEWORK_SCAN", result.errorCode)
+    assertNull(result.value)
+  }
+
+  @Test
+  @Config(sdk = [28, 33])
+  @Suppress("DEPRECATION")
+  fun detectAppFrameworks_reportsAccessFailuresInsteadOfAnEmptyResult() {
+    val packageManager = mock(PackageManager::class.java)
+    if (android.os.Build.VERSION.SDK_INT >= 33) {
+      Mockito.`when`(packageManager.getApplicationInfo(Mockito.eq("com.denied.app"), Mockito.any(PackageManager.ApplicationInfoFlags::class.java)))
+        .thenThrow(SecurityException("denied"))
+    } else {
+      Mockito.`when`(packageManager.getApplicationInfo("com.denied.app", 0))
+        .thenThrow(SecurityException("denied"))
+    }
+    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), packageManager)
+    val result = queryMethod(testPlugin, "detectAppFrameworks", mapOf("packageName" to "com.denied.app"))
+    assertEquals("ERR_FRAMEWORK_SCAN", result.errorCode)
+    assertNull(result.value)
+  }
+
+  @Suppress("DEPRECATION")
+  private fun frameworkPackageManager(info: ApplicationInfo): PackageManager {
+    val packageManager = mock(PackageManager::class.java)
+    if (android.os.Build.VERSION.SDK_INT >= 33) {
+      Mockito.`when`(packageManager.getApplicationInfo(Mockito.eq(info.packageName), Mockito.any(PackageManager.ApplicationInfoFlags::class.java)))
+        .thenReturn(info)
+    } else {
+      Mockito.`when`(packageManager.getApplicationInfo(info.packageName, 0)).thenReturn(info)
+    }
+    return packageManager
+  }
+
+  private fun frameworkApk(name: String, vararg entries: String): File = temporaryFolder.newFile(name).also { file ->
+    ZipOutputStream(file.outputStream()).use { output ->
+      for (entry in entries) {
+        output.putNextEntry(ZipEntry(entry))
+        output.write(byteArrayOf(0))
+        output.closeEntry()
+      }
     }
   }
 

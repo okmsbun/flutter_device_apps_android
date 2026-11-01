@@ -19,6 +19,7 @@ import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.*
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.IOException
 
 open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
 
@@ -119,6 +120,30 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
             mainHandler.post { result.success(apps) }
           } catch (e: Exception) {
             mainHandler.post { result.error("ERR_GET_APPS", e.message, null) }
+          }
+        }
+      }
+      "detectAppFrameworks" -> {
+        val pkg = (call.arguments as? Map<*, *>)?.get("packageName") as? String
+        if (pkg.isNullOrBlank()) return result.error("ARG", "packageName required", null)
+        scope.launch {
+          try {
+            val app = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+              pm.getApplicationInfo(pkg, PackageManager.ApplicationInfoFlags.of(0))
+            } else {
+              @Suppress("DEPRECATION")
+              pm.getApplicationInfo(pkg, 0)
+            }
+            val basePath = app.sourceDir
+            if (basePath.isNullOrBlank()) throw IOException("Base APK path is unavailable")
+            val frameworks = AppFrameworkDetector.detect(listOf(basePath) + app.splitSourceDirs.orEmpty())
+            mainHandler.post { result.success(frameworks) }
+          } catch (_: PackageManager.NameNotFoundException) {
+            mainHandler.post { result.error("APP_NOT_FOUND", "Package not found or not visible", null) }
+          } catch (e: CancellationException) {
+            throw e
+          } catch (e: Exception) {
+            mainHandler.post { result.error("ERR_FRAMEWORK_SCAN", e.message, null) }
           }
         }
       }

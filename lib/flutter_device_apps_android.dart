@@ -88,6 +88,12 @@ class FlutterDeviceAppsAndroid extends FlutterDeviceAppsPlatform {
   }
 
   @override
+  Future<List<AppFramework>> detectAppFrameworks(String packageName) async {
+    final List raw = await _mch.invokeMethod('detectAppFrameworks', {'packageName': packageName});
+    return raw.cast<String>().map(AppFramework.values.byName).toList();
+  }
+
+  @override
   Future<Uint8List?> getAppIcon(String packageName) =>
       _mch.invokeMethod<Uint8List>('getAppIcon', {'packageName': packageName});
 

@@ -223,6 +223,37 @@ void main() {
     });
   });
 
+  group('detectAppFrameworks', () {
+    test('decodes all native identifiers and forwards the exact package name', () async {
+      final List<AppFramework> frameworks = await plugin.detectAppFrameworks('com.example.app');
+      expect(frameworks, AppFramework.values);
+      expect(methodCalls, hasLength(1));
+      expect(methodCalls.single.method, 'detectAppFrameworks');
+      expect(methodCalls.single.arguments, {'packageName': 'com.example.app'});
+    });
+
+    test('preserves a successful empty result', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('flutter_device_apps/methods'),
+        (MethodCall call) async => <String>[],
+      );
+      expect(await plugin.detectAppFrameworks('com.example.app'), isEmpty);
+    });
+
+    test('does not turn argument, package, or scan failures into an empty result', () async {
+      for (final code in ['ARG', 'APP_NOT_FOUND', 'ERR_FRAMEWORK_SCAN']) {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+          const MethodChannel('flutter_device_apps/methods'),
+          (MethodCall call) async => throw PlatformException(code: code),
+        );
+        await expectLater(
+          plugin.detectAppFrameworks('com.example.app'),
+          throwsA(isA<PlatformException>().having((error) => error.code, 'code', code)),
+        );
+      }
+    });
+  });
+
   group('getAppIcon', () {
     test('returns typed icon bytes without requesting metadata', () async {
       final Uint8List? bytes = await plugin.getAppIcon('com.example.app1');
@@ -452,6 +483,9 @@ Object? _handleMethodCall(MethodCall call) {
         _createAppMap('com.example.app2', 'App 2'),
         _createAppMap('com.example.app1', 'App 1'),
       ];
+
+    case 'detectAppFrameworks':
+      return ['flutter', 'reactNative', 'unity', 'unrealEngine', 'godot', 'dotnetAndroid'];
 
     case 'getApp':
       final packageName = args!['packageName']! as String;
