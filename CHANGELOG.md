@@ -1,3 +1,9 @@
+## 2.0.0
+
+- **Breaking change.** `FlutterDeviceAppsAndroid` now uses static methods and `AndroidApp*` types. Removed `flutter_device_apps_platform_interface`.
+- Deprecated `registerWith()`.
+- Expanded framework detection and added an Android example with widget tests.
+
 ## 1.1.0
 
 - **BREAKING**: Removed `getInstallerStore`; use `getInstallSourceInfo`.
