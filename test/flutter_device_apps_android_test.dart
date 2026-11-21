@@ -485,7 +485,20 @@ Object? _handleMethodCall(MethodCall call) {
       ];
 
     case 'detectAppFrameworks':
-      return ['flutter', 'reactNative', 'unity', 'unrealEngine', 'godot', 'dotnetAndroid'];
+      return [
+        'flutter',
+        'reactNative',
+        'unity',
+        'unrealEngine',
+        'godot',
+        'dotnetAndroid',
+        'jetpackCompose',
+        'kotlin',
+        'androidxAppCompat',
+        'capacitor',
+        'cordova',
+        'qt',
+      ];
 
     case 'getApp':
       final packageName = args!['packageName']! as String;
