@@ -5,6 +5,9 @@ formatter:
 
 linter:
   rules:
+    future_sync_value: true
+    no_runtimetype_tostring: true
+    unnecessary_this_alias: true
     always_declare_return_types: true
     avoid_relative_lib_imports: true
     annotate_overrides: true
@@ -84,7 +87,6 @@ linter:
     no_leading_underscores_for_local_identifiers: true
     no_literal_bool_comparisons: true
     no_logic_in_create_state: true
-    no_runtimeType_tostring: true
     no_self_assignments: true
     no_wildcard_variable_uses: true
     non_constant_identifier_names: true
@@ -197,7 +199,7 @@ linter:
     unnecessary_library_name: true
     use_truncating_division: true
     strict_top_level_inference: true
-    unnecessary_async: false
+    unnecessary_async: true
     unnecessary_underscores: true
     unsafe_variance: true
     simplify_variable_pattern: true
