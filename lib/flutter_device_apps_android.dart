@@ -1,155 +1,187 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_device_apps_platform_interface/flutter_device_apps_app_change_event.dart';
-import 'package:flutter_device_apps_platform_interface/flutter_device_apps_platform_interface.dart';
 
-/// Android implementation of [FlutterDeviceAppsPlatform].
-class FlutterDeviceAppsAndroid extends FlutterDeviceAppsPlatform {
-  /// Constructs a [FlutterDeviceAppsAndroid].
-  FlutterDeviceAppsAndroid() : super();
+import 'android_app_types.dart';
 
-  /// Registers this class as the platform implementation for Android.
-  static void registerWith() {
-    FlutterDeviceAppsPlatform.instance = FlutterDeviceAppsAndroid();
-  }
+export 'android_app_types.dart';
+
+/// Queries and manages installed Android apps through Flutter channels.
+/// Android package visibility rules apply to app queries.
+abstract final class FlutterDeviceAppsAndroid {
+  /// Compatibility entry point for callers that previously registered Android.
+  @Deprecated('Android app queries initialize automatically. Remove this call.')
+  static void registerWith() {}
 
   static const MethodChannel _mch = MethodChannel('flutter_device_apps/methods');
   static const EventChannel _ech = EventChannel('flutter_device_apps/app_changes');
+  static const String _unsupportedMessage = 'FlutterDeviceAppsAndroid only supports Android.';
 
-  late final StreamController<AppChangeEvent> _controller =
-      StreamController<AppChangeEvent>.broadcast(onListen: _onListen, onCancel: _onCancel);
+  static bool get _isAndroid => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
-  StreamSubscription<dynamic>? _eventSubscription;
-  Future<void> _streamLifecycle = Future<void>.value();
+  static Future<T?> _invokeMethod<T>(String method, [Object? arguments]) {
+    if (!_isAndroid) return Future<T?>.error(UnsupportedError(_unsupportedMessage));
+    return _mch.invokeMethod<T>(method, arguments);
+  }
 
-  Future<void> _onListen() => _queueStreamOperation(() async {
+  static final StreamController<AndroidAppChangeEvent> _controller =
+      StreamController<AndroidAppChangeEvent>.broadcast(onListen: _onListen, onCancel: _onCancel);
+
+  static StreamSubscription<dynamic>? _eventSubscription;
+  static Future<void>? _streamLifecycle;
+
+  static Future<void> _onListen() => _queueStreamOperation(() async {
     if (!_controller.hasListener || _eventSubscription != null) return;
-    await _mch.invokeMethod<void>('startAppChangeStream');
+    await _invokeMethod<void>('startAppChangeStream');
     if (!_controller.hasListener) return;
     _eventSubscription = _ech.receiveBroadcastStream().listen(
       (event) {
-        _controller.add(AppChangeEvent.fromMap(Map<String, Object?>.from(event as Map)));
+        _controller.add(AndroidAppChangeEvent.fromMap(Map<String, Object?>.from(event as Map)));
       },
       onError: (error) => _controller.addError(error),
       onDone: () => _controller.close(),
     );
   });
 
-  Future<void> _onCancel() => _queueStreamOperation(() async {
+  static Future<void> _onCancel() => _queueStreamOperation(() async {
     await _eventSubscription?.cancel();
     _eventSubscription = null;
-    await _mch.invokeMethod<void>('stopAppChangeStream');
+    await _invokeMethod<void>('stopAppChangeStream');
   });
 
   // Complete shutdown before starting a new subscription on the same channel.
-  Future<void> _queueStreamOperation(Future<void> Function() operation) => _streamLifecycle =
-      _streamLifecycle.then((_) => operation()).catchError((Object error, StackTrace stackTrace) {
-        if (!_controller.isClosed) _controller.addError(error, stackTrace);
-      });
+  static Future<void> _queueStreamOperation(Future<void> Function() operation) {
+    final queued = (_streamLifecycle ?? Future<void>.value()).then((_) => operation()).catchError((
+      Object error,
+      StackTrace stackTrace,
+    ) {
+      if (!_controller.isClosed) _controller.addError(error, stackTrace);
+    });
+    _streamLifecycle = queued;
+    return queued.whenComplete(() {
+      if (identical(_streamLifecycle, queued)) _streamLifecycle = null;
+    });
+  }
 
-  @override
-  Stream<AppChangeEvent> get appChanges => _controller.stream;
+  /// Watches app installs, updates, and removals while the stream has listeners.
+  static Stream<AndroidAppChangeEvent> get appChanges => _isAndroid
+      ? _controller.stream
+      : Stream<AndroidAppChangeEvent>.error(UnsupportedError(_unsupportedMessage));
 
-  @override
-  Future<List<AppInfo>> listApps({
+  /// Lists visible Android apps using optional case-sensitive package name filters.
+  /// Empty filters are ignored. When both are provided, both must match.
+  static Future<List<AndroidAppInfo>> listApps({
     bool includeSystem = false,
     bool onlyLaunchable = true,
     bool includeIcons = false,
     String? packageNamePrefix,
     String? packageNameContains,
   }) async {
-    final List raw = await _mch.invokeMethod('listApps', {
+    final List raw = await _invokeMethod('listApps', {
       'includeSystem': includeSystem,
       'onlyLaunchable': onlyLaunchable,
       'includeIcons': includeIcons,
       'packageNamePrefix': packageNamePrefix,
       'packageNameContains': packageNameContains,
     });
-    return raw.cast<Map>().map((m) => AppInfo.fromMap(Map<String, Object?>.from(m))).toList();
+    return raw
+        .cast<Map>()
+        .map((m) => AndroidAppInfo.fromMap(Map<String, Object?>.from(m)))
+        .toList();
   }
 
-  @override
-  Future<AppInfo?> getApp(String packageName, {bool includeIcon = false}) async {
-    final Map? m = await _mch.invokeMethod('getApp', {
+  /// Gets metadata for an exact package name, or null when it is unavailable.
+  static Future<AndroidAppInfo?> getApp(String packageName, {bool includeIcon = false}) async {
+    final Map? m = await _invokeMethod('getApp', {
       'packageName': packageName,
       'includeIcon': includeIcon,
     });
-    return m == null ? null : AppInfo.fromMap(Map<String, Object?>.from(m));
+    return m == null ? null : AndroidAppInfo.fromMap(Map<String, Object?>.from(m));
   }
 
-  @override
-  Future<List<AppInfo>> getApps(List<String> packageNames, {bool includeIcons = false}) async {
-    final List raw = await _mch.invokeMethod('getApps', {
+  /// Gets metadata for exact package names in one request.
+  /// Returns each visible app once in input order and skips unavailable names.
+  static Future<List<AndroidAppInfo>> getApps(
+    List<String> packageNames, {
+    bool includeIcons = false,
+  }) async {
+    final List raw = await _invokeMethod('getApps', {
       'packageNames': packageNames,
       'includeIcons': includeIcons,
     });
-    return raw.cast<Map>().map((m) => AppInfo.fromMap(Map<String, Object?>.from(m))).toList();
+    return raw
+        .cast<Map>()
+        .map((m) => AndroidAppInfo.fromMap(Map<String, Object?>.from(m)))
+        .toList();
   }
 
-  @override
-  Future<List<AppFramework>> detectAppFrameworks(String packageName) async {
-    final List raw = await _mch.invokeMethod('detectAppFrameworks', {'packageName': packageName});
-    return raw.cast<String>().map(AppFramework.values.byName).toList();
+  /// Finds known framework components in the base and installed split APKs.
+  /// A match can come from a transitive dependency. No match returns an empty
+  /// list, and an unavailable package or unreadable APK throws.
+  static Future<List<AndroidAppFramework>> detectAppFrameworks(String packageName) async {
+    final List raw = await _invokeMethod('detectAppFrameworks', {'packageName': packageName});
+    return raw.cast<String>().map(AndroidAppFramework.values.byName).toList();
   }
 
-  @override
-  Future<Uint8List?> getAppIcon(String packageName) =>
-      _mch.invokeMethod<Uint8List>('getAppIcon', {'packageName': packageName});
+  /// Gets an app icon as PNG bytes, or null when it is unavailable.
+  static Future<Uint8List?> getAppIcon(String packageName) =>
+      _invokeMethod<Uint8List>('getAppIcon', {'packageName': packageName});
 
-  @override
-  Future<bool> isAppInstalled(String packageName) async {
-    final bool? installed = await _mch.invokeMethod<bool>('isAppInstalled', {
+  /// Checks if an app is installed and visible, including disabled apps.
+  static Future<bool> isAppInstalled(String packageName) async {
+    final bool? installed = await _invokeMethod<bool>('isAppInstalled', {
       'packageName': packageName,
     });
     return installed ?? false;
   }
 
-  @override
-  Future<bool?> isSystemApp(String packageName) =>
-      _mch.invokeMethod<bool>('isSystemApp', {'packageName': packageName});
+  /// Returns whether the app is a system app, or null when it is unavailable.
+  static Future<bool?> isSystemApp(String packageName) =>
+      _invokeMethod<bool>('isSystemApp', {'packageName': packageName});
 
-  @override
-  Future<bool?> isAppEnabled(String packageName) =>
-      _mch.invokeMethod<bool>('isAppEnabled', {'packageName': packageName});
+  /// Returns whether the app is enabled, or null when it is unavailable.
+  static Future<bool?> isAppEnabled(String packageName) =>
+      _invokeMethod<bool>('isAppEnabled', {'packageName': packageName});
 
-  @override
-  Future<bool> isAppLaunchable(String packageName) async {
-    final bool? launchable = await _mch.invokeMethod<bool>('isAppLaunchable', {
+  /// Checks if Android provides a launch intent for the package.
+  static Future<bool> isAppLaunchable(String packageName) async {
+    final bool? launchable = await _invokeMethod<bool>('isAppLaunchable', {
       'packageName': packageName,
     });
     return launchable ?? false;
   }
 
-  @override
-  Future<List<String>?> getRequestedPermissions(String packageName) async {
-    final List<dynamic>? raw = await _mch.invokeMethod<List<dynamic>>('getRequestedPermissions', {
+  /// Gets an app's requested permission names, or null when unavailable.
+  static Future<List<String>?> getRequestedPermissions(String packageName) async {
+    final List<dynamic>? raw = await _invokeMethod<List<dynamic>>('getRequestedPermissions', {
       'packageName': packageName,
     });
     return raw?.map((e) => e.toString()).toList();
   }
 
-  @override
-  Future<bool> openApp(String packageName) async {
-    final bool ok = await _mch.invokeMethod('openApp', {'packageName': packageName});
+  /// Launches an app and returns whether Android opened it.
+  static Future<bool> openApp(String packageName) async {
+    final bool ok = await _invokeMethod('openApp', {'packageName': packageName});
     return ok;
   }
 
-  @override
-  Future<bool> openAppSettings(String packageName) async {
-    final bool ok = await _mch.invokeMethod('openAppSettings', {'packageName': packageName});
+  /// Opens an app's settings and returns whether Android opened them.
+  static Future<bool> openAppSettings(String packageName) async {
+    final bool ok = await _invokeMethod('openAppSettings', {'packageName': packageName});
     return ok;
   }
 
-  @override
-  Future<bool> uninstallApp(String packageName) async {
-    final bool? ok = await _mch.invokeMethod<bool>('uninstallApp', {'packageName': packageName});
+  /// Returns whether Android opened the app's uninstall confirmation screen.
+  static Future<bool> uninstallApp(String packageName) async {
+    final bool? ok = await _invokeMethod<bool>('uninstallApp', {'packageName': packageName});
     return ok ?? false;
   }
 
-  @override
-  Future<AppInstallSourceInfo?> getInstallSourceInfo(String packageName) async {
-    final Map? m = await _mch.invokeMethod('getInstallSourceInfo', {'packageName': packageName});
-    return m == null ? null : AppInstallSourceInfo.fromMap(Map<String, Object?>.from(m));
+  /// Gets installer metadata. Android versions below API 30 provide the installer
+  /// package name when available.
+  static Future<AndroidAppInstallSourceInfo?> getInstallSourceInfo(String packageName) async {
+    final Map? m = await _invokeMethod('getInstallSourceInfo', {'packageName': packageName});
+    return m == null ? null : AndroidAppInstallSourceInfo.fromMap(Map<String, Object?>.from(m));
   }
 }
