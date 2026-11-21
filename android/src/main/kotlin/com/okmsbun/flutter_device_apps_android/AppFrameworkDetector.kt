@@ -14,7 +14,10 @@ internal object AppFrameworkDetector {
     "libUE4.so" to "unrealEngine",
     "libgodot_android.so" to "godot",
     "libmonodroid.so" to "dotnetAndroid",
-    "libxamarin-app.so" to "dotnetAndroid"
+    "libxamarin-app.so" to "dotnetAndroid",
+    "libNativeScript.so" to "nativeScript",
+    "libSDL2.so" to "sdl",
+    "libSDL3.so" to "sdl"
   )
   private val frameworkByEntry = linkedMapOf(
     "META-INF/androidx.compose.ui_ui.version" to "jetpackCompose",

@@ -21,6 +21,8 @@ internal class AppFrameworkDetectorTest {
       "META-INF/kotlin-stdlib.kotlin_module",
       "META-INF/androidx.appcompat_appcompat.version",
       "META-INF/androidx.compose.ui_ui.version",
+      "lib/arm64-v8a/libNativeScript.so",
+      "lib/arm64-v8a/libSDL2.so",
       "lib/arm64-v8a/libmonodroid.so",
       "lib/arm64-v8a/libgodot_android.so",
       "lib/arm64-v8a/libUnreal.so",
@@ -28,6 +30,8 @@ internal class AppFrameworkDetectorTest {
     )
     val split = apk("split.apk",
       "assets/capacitor.config.json",
+      "lib/x86_64/libNativeScript.so",
+      "lib/x86_64/libSDL3.so",
       "lib/arm64-v8a/libQt6Core_arm64-v8a.so",
       "kotlin/kotlin.kotlin_builtins",
       "META-INF/androidx.compose.runtime_runtime.version",
@@ -39,11 +43,19 @@ internal class AppFrameworkDetectorTest {
     )
     assertEquals(
       listOf(
-        "flutter", "reactNative", "unity", "unrealEngine", "godot", "dotnetAndroid",
+        "flutter", "reactNative", "unity", "unrealEngine", "godot", "dotnetAndroid", "nativeScript", "sdl",
         "jetpackCompose", "kotlin", "androidxAppCompat", "capacitor", "cordova", "qt"
       ),
       AppFrameworkDetector.detect(listOf(base.path, split.path, base.path))
     )
+  }
+
+  @Test
+  fun recognizesBothSdlVersionsIndependently() {
+    for (version in 2..3) {
+      val app = apk("sdl$version.apk", "lib/arm64-v8a/libSDL$version.so")
+      assertEquals(listOf("sdl"), AppFrameworkDetector.detect(listOf(app.path)))
+    }
   }
 
   @Test
@@ -74,6 +86,9 @@ internal class AppFrameworkDetectorTest {
     val app = apk("lookalikes.apk",
       "assets/lib/arm64-v8a/libflutter.so",
       "assets/libunity.so",
+      "assets/libNativeScript.so",
+      "lib/arm64-v8a/nested/libSDL3.so",
+      "lib/arm64-v8a/libsdl2.so",
       "assets/public/cordova.js",
       "assets/www/cordova.js/",
       "assets/public/capacitor.config.json",
@@ -116,6 +131,8 @@ internal class AppFrameworkDetectorTest {
       "lib/arm64-v8a/libUnreal.so",
       "lib/arm64-v8a/libgodot_android.so",
       "lib/arm64-v8a/libmonodroid.so",
+      "lib/arm64-v8a/libNativeScript.so",
+      "lib/arm64-v8a/libSDL3.so",
       "META-INF/androidx.compose.ui_ui.version",
       "META-INF/kotlin-stdlib.kotlin_module",
       "META-INF/androidx.appcompat_appcompat.version",

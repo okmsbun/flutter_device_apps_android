@@ -519,6 +519,8 @@ Object? _handleMethodCall(MethodCall call) {
         'capacitor',
         'cordova',
         'qt',
+        'nativeScript',
+        'sdl',
       ];
 
     case 'getApp':

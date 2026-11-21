@@ -40,6 +40,12 @@ enum AndroidAppFramework {
 
   /// Qt 5 or Qt 6 Core native library.
   qt,
+
+  /// The NativeScript Android runtime library.
+  nativeScript,
+
+  /// An SDL 2 or SDL 3 native library.
+  sdl,
 }
 
 /// Information about an installed app on the device.
