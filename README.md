@@ -130,6 +130,10 @@ open the uninstall confirmation screen with `uninstallApp()`. [Android permissio
 <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 ```
 
+## Community Standards
+
+[Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Security Policy](SECURITY.md)
+
 ## License
 
 [MIT](LICENSE) © 2026 okmsbun
