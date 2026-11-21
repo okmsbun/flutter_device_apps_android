@@ -40,7 +40,7 @@ abstract final class FlutterDeviceAppsAndroid {
         _controller.add(AndroidAppChangeEvent.fromMap(Map<String, Object?>.from(event as Map)));
       },
       onError: (error) => _controller.addError(error),
-      onDone: () => _controller.close(),
+      onDone: _controller.close,
     );
   });
 
@@ -52,12 +52,11 @@ abstract final class FlutterDeviceAppsAndroid {
 
   // Complete shutdown before starting a new subscription on the same channel.
   static Future<void> _queueStreamOperation(Future<void> Function() operation) {
-    final queued = (_streamLifecycle ?? Future<void>.value()).then((_) => operation()).catchError((
-      Object error,
-      StackTrace stackTrace,
-    ) {
-      if (!_controller.isClosed) _controller.addError(error, stackTrace);
-    });
+    final Future<void> queued = (_streamLifecycle ?? Future<void>.value())
+        .then((_) => operation())
+        .catchError((Object error, StackTrace stackTrace) {
+          if (!_controller.isClosed) _controller.addError(error, stackTrace);
+        });
     _streamLifecycle = queued;
     return queued.whenComplete(() {
       if (identical(_streamLifecycle, queued)) _streamLifecycle = null;

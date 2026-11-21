@@ -22,3 +22,7 @@ jobs:
 
       - name: Run tests
         run: flutter test
+
+      - name: Run example tests
+        working-directory: example
+        run: flutter test --no-pub
