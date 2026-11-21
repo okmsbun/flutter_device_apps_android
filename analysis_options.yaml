@@ -202,7 +202,6 @@ linter:
     unnecessary_async: true
     unnecessary_underscores: true
     unsafe_variance: true
-    remove_deprecations_in_breaking_versions: true
     simplify_variable_pattern: true
     specify_nonobvious_property_types: true
     switch_on_type: true
@@ -250,6 +249,7 @@ linter:
     no_raw_types: false
     unnecessary_const_in_enum_constructor: false
     no_dynamic_casts: false
+    remove_deprecations_in_breaking_versions: false
 
 analyzer:
   exclude:
