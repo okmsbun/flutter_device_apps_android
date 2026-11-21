@@ -15,6 +15,11 @@ Requires Android API 24+, Flutter 3.44+, and Dart 3.12+.
 [API reference](https://pub.dev/documentation/flutter_device_apps_android/latest/flutter_device_apps_android/)
 · [Guide: List installed Android apps in Flutter](doc/list-installed-android-apps.md)
 
+## Main package
+
+`flutter_device_apps` provides a single entry point for device app APIs and
+uses this plugin on Android. [Main package README](https://github.com/okmsbun/flutter_device_apps#readme)
+
 ## Usage
 
 Add the Android package to your Flutter app.
