@@ -17,12 +17,20 @@ internal class AppFrameworkDetectorTest {
   @Test
   fun combinesBaseAndSplitsAcrossAbisInCanonicalOrderWithoutDuplicates() {
     val base = apk("base.apk",
+      "assets/www/cordova.js",
+      "META-INF/kotlin-stdlib.kotlin_module",
+      "META-INF/androidx.appcompat_appcompat.version",
+      "META-INF/androidx.compose.ui_ui.version",
       "lib/arm64-v8a/libmonodroid.so",
       "lib/arm64-v8a/libgodot_android.so",
       "lib/arm64-v8a/libUnreal.so",
       "lib/arm64-v8a/libunity.so"
     )
     val split = apk("split.apk",
+      "assets/capacitor.config.json",
+      "lib/arm64-v8a/libQt6Core_arm64-v8a.so",
+      "kotlin/kotlin.kotlin_builtins",
+      "META-INF/androidx.compose.runtime_runtime.version",
       "lib/x86_64/libunity.so",
       "lib/arm64-v8a/libreactnative.so",
       "lib/x86/libreactnativejni.so",
@@ -30,9 +38,22 @@ internal class AppFrameworkDetectorTest {
       "lib/arm64-v8a/libflutter.so"
     )
     assertEquals(
-      listOf("flutter", "reactNative", "unity", "unrealEngine", "godot", "dotnetAndroid"),
+      listOf(
+        "flutter", "reactNative", "unity", "unrealEngine", "godot", "dotnetAndroid",
+        "jetpackCompose", "kotlin", "androidxAppCompat", "capacitor", "cordova", "qt"
+      ),
       AppFrameworkDetector.detect(listOf(base.path, split.path, base.path))
     )
+  }
+
+  @Test
+  fun recognizesRuntimeMetadataAndLegacyQtWithoutOtherMarkers() {
+    val app = apk("runtime.apk",
+      "META-INF/androidx.compose.runtime_runtime.version",
+      "kotlin/kotlin.kotlin_builtins",
+      "lib/armeabi-v7a/libQt5Core.so"
+    )
+    assertEquals(listOf("jetpackCompose", "kotlin", "qt"), AppFrameworkDetector.detect(listOf(app.path)))
   }
 
   @Test
@@ -53,6 +74,13 @@ internal class AppFrameworkDetectorTest {
     val app = apk("lookalikes.apk",
       "assets/lib/arm64-v8a/libflutter.so",
       "assets/libunity.so",
+      "assets/public/cordova.js",
+      "assets/www/cordova.js/",
+      "assets/public/capacitor.config.json",
+      "META-INF/custom.kotlin_module",
+      "META-INF/androidx.activity_activity-compose.version",
+      "META-INF/androidx.compose.ui_ui.version.bak",
+      "META-INF/androidx.appcompat_appcompat-resources.version",
       "lib/arm64-v8a/nested/libUnreal.so",
       "lib/libgodot_android.so",
       "lib//libUE4.so",
@@ -65,6 +93,8 @@ internal class AppFrameworkDetectorTest {
       "lib/arm64-v8a/libmono.so",
       "lib/arm64-v8a/libmonosgen-2.0.so",
       "lib/arm64-v8a/libil2cpp.so",
+      "lib/arm64-v8a/libQt6Core_x86.so",
+      "lib/arm64-v8a/libQt6Core_extra.so",
       "lib/arm64-v8a/libc++_shared.so"
     )
     assertEquals(emptyList<String>(), AppFrameworkDetector.detect(listOf(app.path)))
@@ -85,7 +115,13 @@ internal class AppFrameworkDetectorTest {
       "lib/arm64-v8a/libunity.so",
       "lib/arm64-v8a/libUnreal.so",
       "lib/arm64-v8a/libgodot_android.so",
-      "lib/arm64-v8a/libmonodroid.so"
+      "lib/arm64-v8a/libmonodroid.so",
+      "META-INF/androidx.compose.ui_ui.version",
+      "META-INF/kotlin-stdlib.kotlin_module",
+      "META-INF/androidx.appcompat_appcompat.version",
+      "assets/capacitor.config.json",
+      "assets/www/cordova.js",
+      "lib/arm64-v8a/libQt6Core_arm64-v8a.so"
     )
     val missing = File(temporaryFolder.root, "missing.apk")
     val corrupt = temporaryFolder.newFile("corrupt.apk").apply { writeText("not a ZIP archive") }

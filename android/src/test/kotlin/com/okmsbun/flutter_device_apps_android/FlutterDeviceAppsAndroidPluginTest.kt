@@ -183,7 +183,9 @@ internal class FlutterDeviceAppsAndroidPluginTest {
   @Suppress("DEPRECATION")
   fun detectAppFrameworks_readsBaseAndSplitsWithoutLoadingAppMetadata() {
     val base = frameworkApk("base.apk", "lib/arm64-v8a/libunity.so")
-    val split = frameworkApk("split.apk", "lib/arm64-v8a/libflutter.so", "lib/x86/libunity.so")
+    val split = frameworkApk(
+      "split.apk", "lib/arm64-v8a/libflutter.so", "lib/x86/libunity.so", "assets/capacitor.config.json"
+    )
     val info = ApplicationInfo().apply {
       packageName = "com.example.app"
       sourceDir = base.path
@@ -193,7 +195,7 @@ internal class FlutterDeviceAppsAndroidPluginTest {
     val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), packageManager)
     val result = queryMethod(testPlugin, "detectAppFrameworks", mapOf("packageName" to info.packageName))
     assertNull(result.errorCode)
-    assertEquals(listOf("flutter", "unity"), result.value)
+    assertEquals(listOf("flutter", "unity", "capacitor"), result.value)
     if (android.os.Build.VERSION.SDK_INT >= 33) {
       verify(packageManager).getApplicationInfo(Mockito.eq(info.packageName), Mockito.any(PackageManager.ApplicationInfoFlags::class.java))
     } else {
