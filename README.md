@@ -72,7 +72,7 @@ final frameworks = await FlutterDeviceAppsAndroid.detectAppFrameworks('com.examp
 
 Detects packaged indicators for **Flutter, React Native, Unity, Unreal Engine,
 Godot, .NET Android, Jetpack Compose, Kotlin standard library, AndroidX AppCompat,
-Capacitor, Cordova, and Qt**. Matches describe packaged components, including
+Capacitor, Cordova, Qt, NativeScript, and SDL**. Matches describe packaged components, including
 transitive dependencies. An empty list means the scan found no supported
 indicator. A failed scan throws.
 
