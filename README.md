@@ -11,14 +11,16 @@
 A Flutter plugin to list installed Android apps, get app icons, check installation
 status, launch apps, and monitor app changes. Also detects packaged frameworks.
 
+## Requirements
+
 Requires Android API 24+, Flutter 3.44+, and Dart 3.12+.
 [API reference](https://pub.dev/documentation/flutter_device_apps_android/latest/flutter_device_apps_android/)
 · [Guide: List installed Android apps in Flutter](doc/list-installed-android-apps.md)
 
 ## Main package
 
-`flutter_device_apps` provides a single entry point for device app APIs and
-uses this plugin on Android. [Main package README](https://github.com/okmsbun/flutter_device_apps#readme)
+`flutter_device_apps` provides a single entry point for Android and macOS APIs
+and uses this plugin on Android. [Main package](https://pub.dev/packages/flutter_device_apps) · [Main package README](https://github.com/okmsbun/flutter_device_apps#readme)
 
 ## Usage
 
@@ -70,7 +72,7 @@ final frameworks = await FlutterDeviceAppsAndroid.detectAppFrameworks('com.examp
 
 Detects packaged indicators for **Flutter, React Native, Unity, Unreal Engine,
 Godot, .NET Android, Jetpack Compose, Kotlin standard library, AndroidX AppCompat,
-Capacitor, Cordova, and Qt**. Matches describe packaged components, including
+Capacitor, Cordova, Qt, NativeScript, and SDL**. Matches describe packaged components, including
 transitive dependencies. An empty list means the scan found no supported
 indicator. A failed scan throws.
 
@@ -129,6 +131,10 @@ open the uninstall confirmation screen with `uninstallApp()`. [Android permissio
 ```xml
 <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 ```
+
+## Community Standards
+
+[Issues](https://github.com/okmsbun/flutter_device_apps_android/issues) · [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Security Policy](SECURITY.md)
 
 ## License
 
