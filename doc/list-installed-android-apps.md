@@ -1,7 +1,7 @@
-# How to list installed Android apps in Flutter
+# List installed Android apps in Flutter
 
-Use [flutter_device_apps_android](https://pub.dev/packages/flutter_device_apps_android) to list
-installed apps, read app names and package names, and display app icons on Android.
+Use `FlutterDeviceAppsAndroid.listApps()` to list visible installed apps and
+display their names, package names, and icons.
 Requires Android API 24+, Flutter 3.44+, and Dart 3.12+.
 
 ## Install the plugin
@@ -12,21 +12,20 @@ flutter pub add flutter_device_apps_android
 
 ## Display installed apps with icons
 
-This example lists visible, launchable user apps. Set `includeSystem: true` to
-include system apps or `onlyLaunchable: false` to include apps without a launcher
-entry, subject to Android package visibility.
+Add `material_ui` for the example UI, then put the code in `lib/main.dart` to
+show visible user apps that have a launcher entry.
 
-Use this example in `lib/main.dart`.
+```bash
+flutter pub add material_ui
+```
 
 ```dart
-import 'dart:typed_data';
-
-import 'package:flutter/material.dart';
 import 'package:flutter_device_apps_android/flutter_device_apps_android.dart';
+import 'package:material_ui/material_ui.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final List<AndroidAppInfo> apps = await FlutterDeviceAppsAndroid.listApps(includeIcons: true);
+  final apps = await FlutterDeviceAppsAndroid.listApps(includeIcons: true);
 
   runApp(
     MaterialApp(
@@ -35,8 +34,8 @@ Future<void> main() async {
         body: ListView.builder(
           itemCount: apps.length,
           itemBuilder: (context, index) {
-            final AndroidAppInfo app = apps[index];
-            final Uint8List? icon = app.iconBytes;
+            final app = apps[index];
+            final icon = app.iconBytes;
             return ListTile(
               leading: icon == null
                   ? const Icon(Icons.android)
@@ -56,20 +55,34 @@ Future<void> main() async {
 `runApp()`. The binding is already available in `initState()` and UI callbacks.
 Leave `includeIcons` off when you only need metadata.
 
+## Include system apps or filter by package name
+
+Set `includeSystem: true` to include visible system apps. Set
+`onlyLaunchable: false` to include visible packages without a launcher entry.
+To narrow the list, pass `packageNamePrefix` or `packageNameContains`. Both
+filters are case-sensitive and must match when supplied together.
+
 ## Check or launch an app by package name
 
 ```dart
-final installed = await FlutterDeviceAppsAndroid.isAppInstalled('com.whatsapp');
-if (installed) {
-  await FlutterDeviceAppsAndroid.openApp('com.whatsapp');
+Future<bool> openWhatsApp() async {
+  const packageName = 'com.whatsapp';
+  if (!await FlutterDeviceAppsAndroid.isAppLaunchable(packageName)) {
+    return false;
+  }
+  return FlutterDeviceAppsAndroid.openApp(packageName);
 }
 ```
 
+Use `isAppInstalled` to check for a visible package, including disabled apps.
+Use `getApp` for metadata about one exact package name or `getApps` for several.
+
 ## Android package visibility
 
-Android can hide installed packages from your app. The plugin includes visibility
-for launcher apps. For a specific package, add a declaration inside `<manifest>`
-and outside `<application>` in `android/app/src/main/AndroidManifest.xml`.
+Android 11+ filters package queries from apps that target API 30 or later. The
+plugin declares visibility for launcher apps. To query an additional package,
+add a declaration inside `<manifest>` and outside `<application>` in
+`android/app/src/main/AndroidManifest.xml`.
 
 ```xml
 <queries>
@@ -78,10 +91,18 @@ and outside `<application>` in `android/app/src/main/AndroidManifest.xml`.
 ```
 
 Hidden packages can be omitted from lists, and `isAppInstalled()` can return
-`false` even when the app is installed. See
-[Android package visibility](https://developer.android.com/training/package-visibility/declaring)
-and the [Android setup notes](../README.md#android-setup) for broader queries.
+`false` even when the app is installed. Broader visibility through
+`QUERY_ALL_PACKAGES` is subject to Google Play policy. See the
+[Android package visibility guide](https://developer.android.com/training/package-visibility/declaring)
+and [Android setup notes](../README.md#android-setup).
 
-For batch lookups, framework detection, and app change events, see the
-[README](../README.md) and
-[API reference](https://pub.dev/documentation/flutter_device_apps_android/latest/flutter_device_apps_android/).
+## Detect frameworks in an installed APK
+
+Pass a visible package name to `detectAppFrameworks` to check the base and
+installed split APKs for supported markers. These include Flutter, React Native,
+Jetpack Compose, Kotlin standard library, NativeScript, and SDL 2 and 3. A
+match can come from a dependency. An empty list means the scan found no
+supported marker. An invisible package or an unreadable APK throws.
+
+See the [Android API reference](https://pub.dev/documentation/flutter_device_apps_android/latest/flutter_device_apps_android/)
+or the [Flutter guide for Android and macOS](https://github.com/okmsbun/flutter_device_apps/blob/HEAD/doc/list-installed-android-apps.md).

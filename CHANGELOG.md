@@ -1,3 +1,8 @@
+## 2.1.0
+
+- Added NativeScript and SDL 2/3 detection in base and split APKs, reported as `AndroidAppFramework.nativeScript` and `AndroidAppFramework.sdl`. Update exhaustive switches over `AndroidAppFramework` to handle both new values.
+- Updated the installed apps guide with package visibility, launcher filtering, and APK framework detection.
+
 ## 2.0.0
 
 - **Breaking change.** `FlutterDeviceAppsAndroid` now uses static methods and `AndroidApp*` types. Removed `flutter_device_apps_platform_interface`.
