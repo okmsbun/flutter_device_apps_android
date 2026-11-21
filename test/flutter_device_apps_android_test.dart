@@ -1,16 +1,14 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_device_apps_android/flutter_device_apps_android.dart';
-import 'package:flutter_device_apps_platform_interface/flutter_device_apps_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  late FlutterDeviceAppsAndroid plugin;
   late List<MethodCall> methodCalls;
 
   setUp(() {
-    plugin = FlutterDeviceAppsAndroid();
     methodCalls = [];
 
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
@@ -29,16 +27,25 @@ void main() {
     );
   });
 
-  group('registerWith', () {
-    test('registers instance as platform implementation', () {
-      FlutterDeviceAppsAndroid.registerWith();
-      expect(FlutterDeviceAppsPlatform.instance, isA<FlutterDeviceAppsAndroid>());
-    });
+  test('legacy registration remains callable', () {
+    // Exercise the public method retained for source compatibility.
+    // ignore: deprecated_member_use_from_same_package
+    expect(FlutterDeviceAppsAndroid.registerWith, returnsNormally);
+  });
+
+  test('the Android API reports unsupported operations off Android', () async {
+    final TargetPlatform? originalPlatform = debugDefaultTargetPlatformOverride;
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = originalPlatform);
+
+    await expectLater(FlutterDeviceAppsAndroid.listApps(), throwsUnsupportedError);
+    await expectLater(FlutterDeviceAppsAndroid.appChanges, emitsError(isA<UnsupportedError>()));
+    expect(methodCalls, isEmpty);
   });
 
   group('listApps', () {
     test('calls method channel with default parameters', () async {
-      await plugin.listApps();
+      await FlutterDeviceAppsAndroid.listApps();
 
       expect(methodCalls, hasLength(1));
       expect(methodCalls.first.method, 'listApps');
@@ -52,7 +59,7 @@ void main() {
     });
 
     test('calls method channel with custom parameters', () async {
-      await plugin.listApps(
+      await FlutterDeviceAppsAndroid.listApps(
         includeSystem: true,
         onlyLaunchable: false,
         includeIcons: true,
@@ -71,7 +78,7 @@ void main() {
     });
 
     test('preserves empty package name filters when calling native code', () async {
-      await plugin.listApps(packageNamePrefix: '', packageNameContains: '');
+      await FlutterDeviceAppsAndroid.listApps(packageNamePrefix: '', packageNameContains: '');
       expect(methodCalls.first.arguments, {
         'includeSystem': false,
         'onlyLaunchable': true,
@@ -82,7 +89,7 @@ void main() {
     });
 
     test('supports a prefix without a substring', () async {
-      await plugin.listApps(packageNamePrefix: 'com.example.');
+      await FlutterDeviceAppsAndroid.listApps(packageNamePrefix: 'com.example.');
       expect(methodCalls.single.arguments, {
         'includeSystem': false,
         'onlyLaunchable': true,
@@ -92,8 +99,8 @@ void main() {
       });
     });
 
-    test('returns list of AppInfo', () async {
-      final List<AppInfo> apps = await plugin.listApps();
+    test('returns list of AndroidAppInfo', () async {
+      final List<AndroidAppInfo> apps = await FlutterDeviceAppsAndroid.listApps();
 
       expect(apps, hasLength(2));
       expect(apps[0].packageName, 'com.example.app1');
@@ -116,14 +123,14 @@ void main() {
         (MethodCall methodCall) async => <Map>[],
       );
 
-      final List<AppInfo> apps = await plugin.listApps();
+      final List<AndroidAppInfo> apps = await FlutterDeviceAppsAndroid.listApps();
       expect(apps, isEmpty);
     });
   });
 
   group('getApp', () {
     test('calls method channel with package name', () async {
-      await plugin.getApp('com.example.app1');
+      await FlutterDeviceAppsAndroid.getApp('com.example.app1');
 
       expect(methodCalls, hasLength(1));
       expect(methodCalls.first.method, 'getApp');
@@ -134,13 +141,13 @@ void main() {
     });
 
     test('calls method channel with includeIcon true', () async {
-      await plugin.getApp('com.example.app1', includeIcon: true);
+      await FlutterDeviceAppsAndroid.getApp('com.example.app1', includeIcon: true);
 
       expect(methodCalls.first.arguments, {'packageName': 'com.example.app1', 'includeIcon': true});
     });
 
-    test('returns AppInfo when app exists', () async {
-      final AppInfo? app = await plugin.getApp('com.example.app1');
+    test('returns AndroidAppInfo when app exists', () async {
+      final AndroidAppInfo? app = await FlutterDeviceAppsAndroid.getApp('com.example.app1');
 
       expect(app, isNotNull);
       expect(app!.packageName, 'com.example.app1');
@@ -153,7 +160,7 @@ void main() {
     });
 
     test('returns null when app does not exist', () async {
-      final AppInfo? app = await plugin.getApp('com.nonexistent.app');
+      final AndroidAppInfo? app = await FlutterDeviceAppsAndroid.getApp('com.nonexistent.app');
       expect(app, isNull);
     });
   });
@@ -166,7 +173,7 @@ void main() {
         'com.example.app1',
         'com.example.app2',
       ];
-      final List<AppInfo> apps = await plugin.getApps(names);
+      final List<AndroidAppInfo> apps = await FlutterDeviceAppsAndroid.getApps(names);
       expect(methodCalls, hasLength(1));
       expect(methodCalls.single.method, 'getApps');
       expect(methodCalls.single.arguments, {'packageNames': names, 'includeIcons': false});
@@ -186,7 +193,7 @@ void main() {
           ];
         },
       );
-      final List<AppInfo> apps = await plugin.getApps([
+      final List<AndroidAppInfo> apps = await FlutterDeviceAppsAndroid.getApps([
         'com.example.app2',
         'com.example.app1',
       ], includeIcons: true);
@@ -207,7 +214,7 @@ void main() {
           return <Map>[];
         },
       );
-      expect(await plugin.getApps([]), isEmpty);
+      expect(await FlutterDeviceAppsAndroid.getApps([]), isEmpty);
       expect(methodCalls.single.arguments, {'packageNames': <String>[], 'includeIcons': false});
     });
 
@@ -217,7 +224,7 @@ void main() {
         (MethodCall call) async => throw PlatformException(code: 'ERR_GET_APPS'),
       );
       await expectLater(
-        plugin.getApps(['com.example.app1']),
+        FlutterDeviceAppsAndroid.getApps(['com.example.app1']),
         throwsA(isA<PlatformException>().having((error) => error.code, 'code', 'ERR_GET_APPS')),
       );
     });
@@ -225,8 +232,9 @@ void main() {
 
   group('detectAppFrameworks', () {
     test('decodes all native identifiers and forwards the exact package name', () async {
-      final List<AppFramework> frameworks = await plugin.detectAppFrameworks('com.example.app');
-      expect(frameworks, AppFramework.values);
+      final List<AndroidAppFramework> frameworks =
+          await FlutterDeviceAppsAndroid.detectAppFrameworks('com.example.app');
+      expect(frameworks, AndroidAppFramework.values);
       expect(methodCalls, hasLength(1));
       expect(methodCalls.single.method, 'detectAppFrameworks');
       expect(methodCalls.single.arguments, {'packageName': 'com.example.app'});
@@ -237,7 +245,7 @@ void main() {
         const MethodChannel('flutter_device_apps/methods'),
         (MethodCall call) async => <String>[],
       );
-      expect(await plugin.detectAppFrameworks('com.example.app'), isEmpty);
+      expect(await FlutterDeviceAppsAndroid.detectAppFrameworks('com.example.app'), isEmpty);
     });
 
     test('does not turn argument, package, or scan failures into an empty result', () async {
@@ -247,7 +255,7 @@ void main() {
           (MethodCall call) async => throw PlatformException(code: code),
         );
         await expectLater(
-          plugin.detectAppFrameworks('com.example.app'),
+          FlutterDeviceAppsAndroid.detectAppFrameworks('com.example.app'),
           throwsA(isA<PlatformException>().having((error) => error.code, 'code', code)),
         );
       }
@@ -256,7 +264,7 @@ void main() {
 
   group('getAppIcon', () {
     test('returns typed icon bytes without requesting metadata', () async {
-      final Uint8List? bytes = await plugin.getAppIcon('com.example.app1');
+      final Uint8List? bytes = await FlutterDeviceAppsAndroid.getAppIcon('com.example.app1');
       expect(bytes, Uint8List.fromList([137, 80, 78, 71, 13, 10, 26, 10]));
       expect(methodCalls, hasLength(1));
       expect(methodCalls.first.method, 'getAppIcon');
@@ -264,7 +272,7 @@ void main() {
     });
 
     test('returns null for an unavailable package', () async {
-      expect(await plugin.getAppIcon('com.nonexistent.app'), isNull);
+      expect(await FlutterDeviceAppsAndroid.getAppIcon('com.nonexistent.app'), isNull);
     });
 
     test('propagates icon loading errors', () async {
@@ -273,7 +281,7 @@ void main() {
         (MethodCall call) async => throw PlatformException(code: 'ERR_ICON'),
       );
       await expectLater(
-        plugin.getAppIcon('com.example.app1'),
+        FlutterDeviceAppsAndroid.getAppIcon('com.example.app1'),
         throwsA(isA<PlatformException>().having((error) => error.code, 'code', 'ERR_ICON')),
       );
     });
@@ -281,32 +289,32 @@ void main() {
 
   group('package queries', () {
     test('checks installation directly without fetching metadata', () async {
-      expect(await plugin.isAppInstalled('com.example.app1'), isTrue);
-      expect(await plugin.isAppInstalled('com.nonexistent.app'), isFalse);
+      expect(await FlutterDeviceAppsAndroid.isAppInstalled('com.example.app1'), isTrue);
+      expect(await FlutterDeviceAppsAndroid.isAppInstalled('com.nonexistent.app'), isFalse);
       expect(methodCalls.map((call) => call.method), ['isAppInstalled', 'isAppInstalled']);
       expect(methodCalls.first.arguments, {'packageName': 'com.example.app1'});
     });
 
     test('distinguishes system, user and unavailable packages', () async {
-      expect(await plugin.isSystemApp('com.android.settings'), isTrue);
-      expect(await plugin.isSystemApp('com.example.app1'), isFalse);
-      expect(await plugin.isSystemApp('com.nonexistent.app'), isNull);
+      expect(await FlutterDeviceAppsAndroid.isSystemApp('com.android.settings'), isTrue);
+      expect(await FlutterDeviceAppsAndroid.isSystemApp('com.example.app1'), isFalse);
+      expect(await FlutterDeviceAppsAndroid.isSystemApp('com.nonexistent.app'), isNull);
       expect(methodCalls.every((call) => call.method == 'isSystemApp'), isTrue);
       expect(methodCalls.first.arguments, {'packageName': 'com.android.settings'});
     });
 
     test('distinguishes enabled, disabled and unavailable packages', () async {
-      expect(await plugin.isAppEnabled('com.example.app1'), isTrue);
-      expect(await plugin.isAppEnabled('com.example.disabled'), isFalse);
-      expect(await plugin.isAppEnabled('com.nonexistent.app'), isNull);
+      expect(await FlutterDeviceAppsAndroid.isAppEnabled('com.example.app1'), isTrue);
+      expect(await FlutterDeviceAppsAndroid.isAppEnabled('com.example.disabled'), isFalse);
+      expect(await FlutterDeviceAppsAndroid.isAppEnabled('com.nonexistent.app'), isNull);
       expect(methodCalls.every((call) => call.method == 'isAppEnabled'), isTrue);
       expect(methodCalls.first.arguments, {'packageName': 'com.example.app1'});
     });
 
     test('queries launchability without opening the app or requesting metadata', () async {
-      expect(await plugin.isAppLaunchable('com.example.app1'), isTrue);
-      expect(await plugin.isAppLaunchable('com.example.no_launcher'), isFalse);
-      expect(await plugin.isAppLaunchable('com.nonexistent.app'), isFalse);
+      expect(await FlutterDeviceAppsAndroid.isAppLaunchable('com.example.app1'), isTrue);
+      expect(await FlutterDeviceAppsAndroid.isAppLaunchable('com.example.no_launcher'), isFalse);
+      expect(await FlutterDeviceAppsAndroid.isAppLaunchable('com.nonexistent.app'), isFalse);
       expect(methodCalls.every((call) => call.method == 'isAppLaunchable'), isTrue);
       expect(methodCalls.first.arguments, {'packageName': 'com.example.app1'});
     });
@@ -318,16 +326,19 @@ void main() {
       );
 
       await expectLater(
-        plugin.isAppInstalled('com.example.app1'),
+        FlutterDeviceAppsAndroid.isAppInstalled('com.example.app1'),
         throwsA(isA<PlatformException>()),
       );
-      await expectLater(plugin.isSystemApp('com.example.app1'), throwsA(isA<PlatformException>()));
       await expectLater(
-        plugin.isAppEnabled('com.example.app1'),
+        FlutterDeviceAppsAndroid.isSystemApp('com.example.app1'),
+        throwsA(isA<PlatformException>()),
+      );
+      await expectLater(
+        FlutterDeviceAppsAndroid.isAppEnabled('com.example.app1'),
         throwsA(isA<PlatformException>().having((e) => e.code, 'code', 'ERR_QUERY')),
       );
       await expectLater(
-        plugin.isAppLaunchable('com.example.app1'),
+        FlutterDeviceAppsAndroid.isAppLaunchable('com.example.app1'),
         throwsA(isA<PlatformException>().having((e) => e.code, 'code', 'ERR_QUERY')),
       );
     });
@@ -335,7 +346,7 @@ void main() {
 
   group('getRequestedPermissions', () {
     test('calls method channel with package name', () async {
-      await plugin.getRequestedPermissions('com.example.app1');
+      await FlutterDeviceAppsAndroid.getRequestedPermissions('com.example.app1');
 
       expect(methodCalls, hasLength(1));
       expect(methodCalls.first.method, 'getRequestedPermissions');
@@ -343,7 +354,9 @@ void main() {
     });
 
     test('returns list of permissions', () async {
-      final List<String>? permissions = await plugin.getRequestedPermissions('com.example.app1');
+      final List<String>? permissions = await FlutterDeviceAppsAndroid.getRequestedPermissions(
+        'com.example.app1',
+      );
 
       expect(permissions, isNotNull);
       expect(permissions, contains('android.permission.INTERNET'));
@@ -351,14 +364,16 @@ void main() {
     });
 
     test('returns null for unknown package', () async {
-      final List<String>? permissions = await plugin.getRequestedPermissions('com.nonexistent.app');
+      final List<String>? permissions = await FlutterDeviceAppsAndroid.getRequestedPermissions(
+        'com.nonexistent.app',
+      );
       expect(permissions, isNull);
     });
   });
 
   group('openApp', () {
     test('calls method channel with package name', () async {
-      await plugin.openApp('com.example.app1');
+      await FlutterDeviceAppsAndroid.openApp('com.example.app1');
 
       expect(methodCalls, hasLength(1));
       expect(methodCalls.first.method, 'openApp');
@@ -366,19 +381,19 @@ void main() {
     });
 
     test('returns true on success', () async {
-      final bool result = await plugin.openApp('com.example.app1');
+      final bool result = await FlutterDeviceAppsAndroid.openApp('com.example.app1');
       expect(result, isTrue);
     });
 
     test('returns false on failure', () async {
-      final bool result = await plugin.openApp('com.nonexistent.app');
+      final bool result = await FlutterDeviceAppsAndroid.openApp('com.nonexistent.app');
       expect(result, isFalse);
     });
   });
 
   group('openAppSettings', () {
     test('calls method channel with package name', () async {
-      await plugin.openAppSettings('com.example.app1');
+      await FlutterDeviceAppsAndroid.openAppSettings('com.example.app1');
 
       expect(methodCalls, hasLength(1));
       expect(methodCalls.first.method, 'openAppSettings');
@@ -386,19 +401,19 @@ void main() {
     });
 
     test('returns true on success', () async {
-      final bool result = await plugin.openAppSettings('com.example.app1');
+      final bool result = await FlutterDeviceAppsAndroid.openAppSettings('com.example.app1');
       expect(result, isTrue);
     });
 
     test('returns false on failure', () async {
-      final bool result = await plugin.openAppSettings('com.nonexistent.app');
+      final bool result = await FlutterDeviceAppsAndroid.openAppSettings('com.nonexistent.app');
       expect(result, isFalse);
     });
   });
 
   group('uninstallApp', () {
     test('calls method channel with package name', () async {
-      await plugin.uninstallApp('com.example.app1');
+      await FlutterDeviceAppsAndroid.uninstallApp('com.example.app1');
 
       expect(methodCalls, hasLength(1));
       expect(methodCalls.first.method, 'uninstallApp');
@@ -406,7 +421,7 @@ void main() {
     });
 
     test('returns true on success', () async {
-      final bool result = await plugin.uninstallApp('com.example.app1');
+      final bool result = await FlutterDeviceAppsAndroid.uninstallApp('com.example.app1');
       expect(result, isTrue);
     });
 
@@ -416,14 +431,16 @@ void main() {
         (MethodCall methodCall) async => null,
       );
 
-      final bool result = await plugin.uninstallApp('com.example.app1');
+      final bool result = await FlutterDeviceAppsAndroid.uninstallApp('com.example.app1');
       expect(result, isFalse);
     });
   });
 
   group('getInstallSourceInfo', () {
     test('queries source metadata through its own channel method', () async {
-      final AppInstallSourceInfo? info = await plugin.getInstallSourceInfo('com.example.app1');
+      final AndroidAppInstallSourceInfo? info = await FlutterDeviceAppsAndroid.getInstallSourceInfo(
+        'com.example.app1',
+      );
       expect(methodCalls, hasLength(1));
       expect(methodCalls.first.method, 'getInstallSourceInfo');
       expect(methodCalls.first.arguments, {'packageName': 'com.example.app1'});
@@ -435,18 +452,22 @@ void main() {
     });
 
     test('returns null for an unavailable package', () async {
-      expect(await plugin.getInstallSourceInfo('com.nonexistent.app'), isNull);
+      expect(await FlutterDeviceAppsAndroid.getInstallSourceInfo('com.nonexistent.app'), isNull);
     });
 
     test('returns a model when the installer is unknown', () async {
-      final AppInstallSourceInfo? info = await plugin.getInstallSourceInfo('com.unknown.source');
+      final AndroidAppInstallSourceInfo? info = await FlutterDeviceAppsAndroid.getInstallSourceInfo(
+        'com.unknown.source',
+      );
       expect(info, isNotNull);
       expect(info!.installingPackageName, isNull);
       expect(info.packageSource, isNull);
     });
 
     test('maps a legacy response with only an installer', () async {
-      final AppInstallSourceInfo? info = await plugin.getInstallSourceInfo('com.legacy.app');
+      final AndroidAppInstallSourceInfo? info = await FlutterDeviceAppsAndroid.getInstallSourceInfo(
+        'com.legacy.app',
+      );
       expect(info!.installingPackageName, 'com.android.vending');
       expect(info.initiatingPackageName, isNull);
       expect(info.originatingPackageName, isNull);
@@ -460,7 +481,7 @@ void main() {
         (MethodCall call) async => throw PlatformException(code: 'ERR_INSTALL_SOURCE'),
       );
       await expectLater(
-        plugin.getInstallSourceInfo('com.example.app1'),
+        FlutterDeviceAppsAndroid.getInstallSourceInfo('com.example.app1'),
         throwsA(isA<PlatformException>().having((e) => e.code, 'code', 'ERR_INSTALL_SOURCE')),
       );
     });
@@ -485,7 +506,20 @@ Object? _handleMethodCall(MethodCall call) {
       ];
 
     case 'detectAppFrameworks':
-      return ['flutter', 'reactNative', 'unity', 'unrealEngine', 'godot', 'dotnetAndroid'];
+      return [
+        'flutter',
+        'reactNative',
+        'unity',
+        'unrealEngine',
+        'godot',
+        'dotnetAndroid',
+        'jetpackCompose',
+        'kotlin',
+        'androidxAppCompat',
+        'capacitor',
+        'cordova',
+        'qt',
+      ];
 
     case 'getApp':
       final packageName = args!['packageName']! as String;

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_device_apps_android/flutter_device_apps_android.dart';
-import 'package:flutter_device_apps_platform_interface/flutter_device_apps_app_change_event.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Future<void> _flushEvents() async {
@@ -17,9 +16,8 @@ void main() {
   const events = MethodChannel('flutter_device_apps/app_changes');
   final TestDefaultBinaryMessenger messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-  late FlutterDeviceAppsAndroid plugin;
   late List<String> calls;
-  late List<StreamSubscription<AppChangeEvent>> subscriptions;
+  late List<StreamSubscription<AndroidAppChangeEvent>> subscriptions;
   Completer<void>? startGate;
   Completer<void>? stopGate;
   late bool failNextStart;
@@ -27,14 +25,13 @@ void main() {
   late int activeChannels;
   late int maxActiveChannels;
 
-  StreamSubscription<AppChangeEvent> subscribe(
-    List<AppChangeEvent> received, {
+  StreamSubscription<AndroidAppChangeEvent> subscribe(
+    List<AndroidAppChangeEvent> received, {
     List<Object>? errors,
   }) {
-    final StreamSubscription<AppChangeEvent> subscription = plugin.appChanges.listen(
-      received.add,
-      onError: errors?.add,
-    );
+    final StreamSubscription<AndroidAppChangeEvent> subscription = FlutterDeviceAppsAndroid
+        .appChanges
+        .listen(received.add, onError: errors?.add);
     subscriptions.add(subscription);
     return subscription;
   }
@@ -53,7 +50,6 @@ void main() {
   }
 
   setUp(() {
-    plugin = FlutterDeviceAppsAndroid();
     calls = [];
     subscriptions = [];
     startGate = null;
@@ -108,12 +104,12 @@ void main() {
   });
 
   test('broadcast listeners share one channel until the last listener cancels', () async {
-    expect(plugin.appChanges.isBroadcast, isTrue);
+    expect(FlutterDeviceAppsAndroid.appChanges.isBroadcast, isTrue);
     expect(calls, isEmpty);
-    final firstEvents = <AppChangeEvent>[];
-    final secondEvents = <AppChangeEvent>[];
-    final StreamSubscription<AppChangeEvent> first = subscribe(firstEvents);
-    final StreamSubscription<AppChangeEvent> second = subscribe(secondEvents);
+    final firstEvents = <AndroidAppChangeEvent>[];
+    final secondEvents = <AndroidAppChangeEvent>[];
+    final StreamSubscription<AndroidAppChangeEvent> first = subscribe(firstEvents);
+    final StreamSubscription<AndroidAppChangeEvent> second = subscribe(secondEvents);
     await _flushEvents();
     expect(calls, ['startAppChangeStream', 'event.listen']);
 
@@ -121,7 +117,7 @@ void main() {
     expect(firstEvents, hasLength(1));
     expect(secondEvents, hasLength(1));
     expect(firstEvents.single.packageName, 'com.example.app');
-    expect(firstEvents.single.type, AppChangeType.updated);
+    expect(firstEvents.single.type, AndroidAppChangeType.updated);
     expect(firstEvents.single.isReplacing, isTrue);
 
     await first.cancel();
@@ -139,9 +135,9 @@ void main() {
   });
 
   test('repeated listen and cancel cycles release the channel each time', () async {
-    final received = <AppChangeEvent>[];
+    final received = <AndroidAppChangeEvent>[];
     for (int cycle = 0; cycle < 3; cycle++) {
-      final StreamSubscription<AppChangeEvent> subscription = subscribe(received);
+      final StreamSubscription<AndroidAppChangeEvent> subscription = subscribe(received);
       await _flushEvents();
       expect(activeChannels, 1);
       await sendEvent();
@@ -158,7 +154,7 @@ void main() {
 
   test('cancel during startup does not leave a receiver or channel running', () async {
     startGate = Completer<void>();
-    final StreamSubscription<AppChangeEvent> subscription = subscribe([]);
+    final StreamSubscription<AndroidAppChangeEvent> subscription = subscribe([]);
     await _flushEvents();
     expect(calls, ['startAppChangeStream']);
     await subscription.cancel();
@@ -173,12 +169,12 @@ void main() {
   });
 
   test('immediate resubscribe cancels the previous channel before starting a new one', () async {
-    final oldEvents = <AppChangeEvent>[];
-    final StreamSubscription<AppChangeEvent> first = subscribe(oldEvents);
+    final oldEvents = <AndroidAppChangeEvent>[];
+    final StreamSubscription<AndroidAppChangeEvent> first = subscribe(oldEvents);
     await _flushEvents();
     await first.cancel();
-    final newEvents = <AppChangeEvent>[];
-    final StreamSubscription<AppChangeEvent> second = subscribe(newEvents);
+    final newEvents = <AndroidAppChangeEvent>[];
+    final StreamSubscription<AndroidAppChangeEvent> second = subscribe(newEvents);
     await _flushEvents();
     expect(calls, [
       'startAppChangeStream',
@@ -200,12 +196,12 @@ void main() {
   });
 
   test('resubscribe waits for the previous native stop to finish', () async {
-    final StreamSubscription<AppChangeEvent> first = subscribe([]);
+    final StreamSubscription<AndroidAppChangeEvent> first = subscribe([]);
     await _flushEvents();
     stopGate = Completer<void>();
     await first.cancel();
     await _flushEvents();
-    final StreamSubscription<AppChangeEvent> second = subscribe([]);
+    final StreamSubscription<AndroidAppChangeEvent> second = subscribe([]);
     await _flushEvents();
     expect(calls, ['startAppChangeStream', 'event.listen', 'event.cancel', 'stopAppChangeStream']);
     expect(activeChannels, 0);
@@ -224,15 +220,15 @@ void main() {
   test('startup errors reach listeners and do not prevent a later subscription', () async {
     failNextStart = true;
     final errors = <Object>[];
-    final StreamSubscription<AppChangeEvent> first = subscribe([], errors: errors);
+    final StreamSubscription<AndroidAppChangeEvent> first = subscribe([], errors: errors);
     await _flushEvents();
     expect(errors, [isA<PlatformException>().having((e) => e.code, 'code', 'ERR_STREAM')]);
     expect(activeChannels, 0);
     await first.cancel();
     await _flushEvents();
 
-    final received = <AppChangeEvent>[];
-    final StreamSubscription<AppChangeEvent> second = subscribe(received);
+    final received = <AndroidAppChangeEvent>[];
+    final StreamSubscription<AndroidAppChangeEvent> second = subscribe(received);
     await _flushEvents();
     await sendEvent();
     expect(received, hasLength(1));
@@ -242,9 +238,12 @@ void main() {
   });
 
   test('platform stream errors are forwarded without stopping event delivery', () async {
-    final received = <AppChangeEvent>[];
+    final received = <AndroidAppChangeEvent>[];
     final errors = <Object>[];
-    final StreamSubscription<AppChangeEvent> subscription = subscribe(received, errors: errors);
+    final StreamSubscription<AndroidAppChangeEvent> subscription = subscribe(
+      received,
+      errors: errors,
+    );
     await _flushEvents();
     await messenger.handlePlatformMessage(
       events.name,

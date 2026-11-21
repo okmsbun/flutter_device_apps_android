@@ -16,8 +16,17 @@ internal object AppFrameworkDetector {
     "libmonodroid.so" to "dotnetAndroid",
     "libxamarin-app.so" to "dotnetAndroid"
   )
-  private val frameworkOrder = frameworkByLibrary.values.distinct()
-  private val nativeLibraryEntry = Regex("lib/[A-Za-z0-9][A-Za-z0-9_-]*/([^/]+)")
+  private val frameworkByEntry = linkedMapOf(
+    "META-INF/androidx.compose.ui_ui.version" to "jetpackCompose",
+    "META-INF/androidx.compose.runtime_runtime.version" to "jetpackCompose",
+    "META-INF/kotlin-stdlib.kotlin_module" to "kotlin",
+    "kotlin/kotlin.kotlin_builtins" to "kotlin",
+    "META-INF/androidx.appcompat_appcompat.version" to "androidxAppCompat",
+    "assets/capacitor.config.json" to "capacitor",
+    "assets/www/cordova.js" to "cordova"
+  )
+  private val frameworkOrder = (frameworkByLibrary.values + frameworkByEntry.values + "qt").distinct()
+  private val nativeLibraryEntry = Regex("lib/([A-Za-z0-9][A-Za-z0-9_-]*)/([^/]+)")
 
   /** Any unreadable APK fails the scan, including after a positive match. */
   @Throws(IOException::class)
@@ -32,11 +41,19 @@ internal object AppFrameworkDetector {
         while (entries.hasMoreElements()) {
           val entry = entries.nextElement()
           if (entry.isDirectory) continue
-          val library = nativeLibraryEntry.matchEntire(entry.name)?.groupValues?.get(1) ?: continue
-          frameworkByLibrary[library]?.let { detected.add(it) }
+          val framework = frameworkByEntry[entry.name] ?: matchNativeLibrary(entry.name) ?: continue
+          detected.add(framework)
         }
       }
     }
     return frameworkOrder.filter { it in detected }
+  }
+
+  private fun matchNativeLibrary(entryName: String): String? {
+    val (abi, library) = nativeLibraryEntry.matchEntire(entryName)?.destructured ?: return null
+    return when (library) {
+      "libQt5Core.so", "libQt6Core.so", "libQt5Core_$abi.so", "libQt6Core_$abi.so" -> "qt"
+      else -> frameworkByLibrary[library]
+    }
   }
 }
