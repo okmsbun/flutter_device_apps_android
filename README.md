@@ -11,14 +11,16 @@
 A Flutter plugin to list installed Android apps, get app icons, check installation
 status, launch apps, and monitor app changes. Also detects packaged frameworks.
 
+## Requirements
+
 Requires Android API 24+, Flutter 3.44+, and Dart 3.12+.
 [API reference](https://pub.dev/documentation/flutter_device_apps_android/latest/flutter_device_apps_android/)
 · [Guide: List installed Android apps in Flutter](doc/list-installed-android-apps.md)
 
 ## Main package
 
-`flutter_device_apps` provides a single entry point for device app APIs and
-uses this plugin on Android. [Main package README](https://github.com/okmsbun/flutter_device_apps#readme)
+`flutter_device_apps` provides a single entry point for Android and macOS APIs
+and uses this plugin on Android. [Main package](https://pub.dev/packages/flutter_device_apps) · [Main package README](https://github.com/okmsbun/flutter_device_apps#readme)
 
 ## Usage
 
@@ -132,7 +134,7 @@ open the uninstall confirmation screen with `uninstallApp()`. [Android permissio
 
 ## Community Standards
 
-[Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Security Policy](SECURITY.md)
+[Issues](https://github.com/okmsbun/flutter_device_apps_android/issues) · [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Security Policy](SECURITY.md)
 
 ## License
 

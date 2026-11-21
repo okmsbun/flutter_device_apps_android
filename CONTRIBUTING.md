@@ -1,6 +1,6 @@
 # Contributing
 
-Report bugs and feature requests in [Issues](https://github.com/okmsbun/flutter_device_apps/issues).
+Report bugs and feature requests in [Issues](https://github.com/okmsbun/flutter_device_apps_android/issues).
 For bugs, include the package version and steps to reproduce. Use the
 [security policy](SECURITY.md) for vulnerabilities.
 
