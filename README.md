@@ -9,7 +9,7 @@
 </p>
 
 A Flutter plugin to list installed Android apps, get app icons, check installation
-status, launch apps, and monitor app changes. Also detects packaged frameworks.
+status, launch apps, and monitor app changes. Also detects packaged app technologies.
 
 ## Requirements
 
@@ -64,17 +64,33 @@ final apps = await FlutterDeviceAppsAndroid.getApps(
 
 `getApp()` returns `null` if the app is unavailable. `getApps()` returns `[]` when no apps are found.
 
-### Detect packaged app frameworks
+### Detect packaged app technologies
 
 ```dart
-final frameworks = await FlutterDeviceAppsAndroid.detectAppFrameworks('com.example.app');
+final technologies = await FlutterDeviceAppsAndroid.detectAppTechnologies('com.example.app');
+final engines = technologies.gameEngines;
+final languages = technologies.programmingLanguages;
 ```
 
-Detects packaged indicators for **Flutter, React Native, Unity, Unreal Engine,
-Godot, .NET Android, Jetpack Compose, Kotlin standard library, AndroidX AppCompat,
-Capacitor, Cordova, Qt, NativeScript, and SDL**. Matches describe packaged components, including
-transitive dependencies. An empty list means the scan found no supported
-indicator. A failed scan throws.
+The result has six lists. A technology can appear in more than one. Matches
+describe packaged components, including dependencies. Empty lists indicate
+that the scan found no supported markers for those categories. A failed scan throws.
+
+| Category | Supported technologies |
+| --- | --- |
+| `frameworks` | Flutter, React Native, .NET for Android, Capacitor, Cordova, Qt, NativeScript |
+| `programmingLanguages` | Dart Kernel and AOT snapshots |
+| `uiToolkits` | Flutter, React Native, Jetpack Compose, Qt Widgets, Qt Quick |
+| `gameEngines` | Unity, Unreal Engine, Godot, Cocos Creator |
+| `runtimes` | .NET for Android, Capacitor, NativeScript, Hermes, JavaScriptCore, Mono, IL2CPP, V8 |
+| `libraries` | Kotlin standard library, AndroidX AppCompat, Qt Core, Qt Widgets, Qt Quick, SDL 2/3, Kotlin coroutines, Compose Material 3, Android Material Components |
+
+Language detection relies on packaged code. Dart matches a Kernel header or
+a supported pair of Dart AOT exports in `libapp.so`, including in release builds.
+The Kotlin standard library appears under `libraries`.
+
+`detectAppFrameworks()` and `AndroidAppFramework` remain available as deprecated APIs
+with their original flat results.
 
 ### Listen to app install, update, and uninstall events
 

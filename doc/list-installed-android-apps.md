@@ -96,13 +96,21 @@ Hidden packages can be omitted from lists, and `isAppInstalled()` can return
 [Android package visibility guide](https://developer.android.com/training/package-visibility/declaring)
 and [Android setup notes](../README.md#android-setup).
 
-## Detect frameworks in an installed APK
+## Detect technologies in an installed APK
 
-Pass a visible package name to `detectAppFrameworks` to check the base and
-installed split APKs for supported markers. These include Flutter, React Native,
-Jetpack Compose, Kotlin standard library, NativeScript, and SDL 2 and 3. A
-match can come from a dependency. An empty list means the scan found no
-supported marker. An invisible package or an unreadable APK throws.
+Pass a visible package name to `detectAppTechnologies` to scan the base and
+installed split APKs. The result groups matches into `frameworks`,
+`programmingLanguages`, `uiToolkits`, `gameEngines`, `runtimes`, and `libraries`.
+A framework such as Flutter can also appear under UI toolkits.
+
+Languages require a direct packaged code marker. Dart can match a Kernel header
+in Flutter assets or matching AOT exports in a packaged `libapp.so`. A Kotlin
+standard library match appears under libraries. A category can be empty,
+and an invisible package or an unreadable APK throws.
+
+See the [supported technologies](../README.md#detect-packaged-app-technologies).
+Existing `detectAppFrameworks` calls retain their flat results and emit a
+deprecation warning on analysis.
 
 See the [Android API reference](https://pub.dev/documentation/flutter_device_apps_android/latest/flutter_device_apps_android/)
 or the [Flutter guide for Android and macOS](https://github.com/okmsbun/flutter_device_apps/blob/HEAD/doc/list-installed-android-apps.md).
