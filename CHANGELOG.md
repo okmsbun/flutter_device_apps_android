@@ -1,3 +1,10 @@
+## 2.2.0
+
+- Added `detectAppTechnologies()` with separate lists for frameworks, programming languages, UI toolkits, game engines, runtimes, and libraries.
+- Added Dart detection from Kernel and AOT snapshots. The Kotlin standard library appears under libraries.
+- Added detection for Hermes, JavaScriptCore, Mono, IL2CPP, V8, Cocos Creator, Qt Widgets, Qt Quick, Kotlin coroutines, Compose Material 3, and Android Material Components.
+- Deprecated `detectAppFrameworks()` and `AndroidAppFramework`. Existing calls retain their flat results.
+
 ## 2.1.0
 
 - Added NativeScript and SDL 2/3 detection in base and split APKs, reported as `AndroidAppFramework.nativeScript` and `AndroidAppFramework.sdl`. Update exhaustive switches over `AndroidAppFramework` to handle both new values.
