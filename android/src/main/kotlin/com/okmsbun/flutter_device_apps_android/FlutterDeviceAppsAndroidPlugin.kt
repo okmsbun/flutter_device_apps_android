@@ -123,7 +123,7 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
           }
         }
       }
-      "detectAppFrameworks" -> {
+      "detectAppFrameworks", "detectAppTechnologies" -> {
         val pkg = (call.arguments as? Map<*, *>)?.get("packageName") as? String
         if (pkg.isNullOrBlank()) return result.error("ARG", "packageName required", null)
         scope.launch {
@@ -136,8 +136,13 @@ open class FlutterDeviceAppsAndroidPlugin : FlutterPlugin, MethodChannel.MethodC
             }
             val basePath = app.sourceDir
             if (basePath.isNullOrBlank()) throw IOException("Base APK path is unavailable")
-            val frameworks = AppFrameworkDetector.detect(listOf(basePath) + app.splitSourceDirs.orEmpty())
-            mainHandler.post { result.success(frameworks) }
+            val apkPaths = listOf(basePath) + app.splitSourceDirs.orEmpty()
+            val technologies = if (call.method == "detectAppTechnologies") {
+              AppFrameworkDetector.detectTechnologies(apkPaths)
+            } else {
+              AppFrameworkDetector.detect(apkPaths)
+            }
+            mainHandler.post { result.success(technologies) }
           } catch (_: PackageManager.NameNotFoundException) {
             mainHandler.post { result.error("APP_NOT_FOUND", "Package not found or not visible", null) }
           } catch (e: CancellationException) {

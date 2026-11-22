@@ -48,6 +48,13 @@ internal class AppFrameworkDetectorTest {
       ),
       AppFrameworkDetector.detect(listOf(base.path, split.path, base.path))
     )
+    assertEquals(
+      setOf(
+        "flutter", "reactNative", "unity", "unrealEngine", "godot", "dotnetAndroid", "nativeScript", "sdl",
+        "jetpackCompose", "kotlinStandardLibrary", "androidxAppCompat", "capacitor", "cordova", "qt"
+      ),
+      AppFrameworkDetector.detectTechnologies(listOf(base.path, split.path, base.path)).toSet()
+    )
   }
 
   @Test
@@ -120,6 +127,64 @@ internal class AppFrameworkDetectorTest {
     val base = apk("base.apk", "AndroidManifest.xml", "classes.dex")
     val split = apk("empty-split.apk")
     assertEquals(emptyList<String>(), AppFrameworkDetector.detect(listOf(base.path, split.path)))
+    assertEquals(emptyList<String>(), AppFrameworkDetector.detectTechnologies(listOf(base.path, split.path)))
+  }
+
+  @Test
+  fun recognizesAdditionalLibrariesAcrossSplitsWithoutChangingLegacyResults() {
+    val base = apk("base.apk",
+      "lib/arm64-v8a/libhermes.so",
+      "lib/arm64-v8a/libQt6Widgets_arm64-v8a.so",
+      "lib/arm64-v8a/libmonosgen-2.0.so",
+      "lib/arm64-v8a/libil2cpp.so",
+      "META-INF/kotlinx_coroutines_core.version"
+    )
+    val split = apk("split.apk",
+      "lib/x86_64/libhermesvm.so",
+      "lib/x86_64/libjsc.so",
+      "lib/x86_64/libQt5Quick.so",
+      "lib/x86_64/libQt6Core_arm64-v8a.so",
+      "META-INF/kotlinx_coroutines_android.version"
+    )
+    val paths = listOf(base.path, split.path)
+    assertEquals(
+      setOf("hermes", "javaScriptCore", "mono", "il2cpp", "qtWidgets", "qtQuick", "kotlinCoroutines"),
+      AppFrameworkDetector.detectTechnologies(paths).toSet()
+    )
+    assertEquals(listOf("hermes", "javaScriptCore", "qtQuick", "kotlinCoroutines"),
+      AppFrameworkDetector.detectTechnologies(listOf(split.path)))
+    assertEquals(emptyList<String>(), AppFrameworkDetector.detect(paths))
+  }
+
+  @Test
+  fun ignoresLookalikeTechnologyEntries() {
+    val app = apk("lookalikes.apk",
+      "assets/lib/arm64-v8a/libhermes.so",
+      "lib/arm64-v8a/libhermestooling.so",
+      "lib/arm64-v8a/libjsctooling.so",
+      "lib/arm64-v8a/libQt6Quick_x86_64.so",
+      "lib/arm64-v8a/libQt6Widgets.so.bak",
+      "META-INF/kotlinx_coroutines_core.version.bak",
+      "lib/arm64-v8a/libmono.so"
+    )
+    assertEquals(emptyList<String>(), AppFrameworkDetector.detectTechnologies(listOf(app.path)))
+  }
+
+  @Test
+  fun detectsDartFromKernelHeaderInThePackagedAsset() {
+    val kernel = "assets/flutter_assets/kernel_blob.bin"
+    val header = byteArrayOf(0x90.toByte(), 0xAB.toByte(), 0xCD.toByte(), 0xEF.toByte(), 0, 0, 0, 1)
+    val base = apk("base.apk", "lib/arm64-v8a/libflutter.so", "lib/arm64-v8a/libapp.so")
+    val split = apk("kernel.apk", mapOf(kernel to header))
+    val truncated = apk("truncated.apk", mapOf(kernel to header.copyOf(4)))
+    val wrongMagic = apk("wrong-magic.apk", mapOf(kernel to ByteArray(8)))
+    val elsewhere = apk("other-path.apk", mapOf("assets/kernel_blob.bin" to header))
+    assertEquals(listOf("flutter", "dart"), AppFrameworkDetector.detectTechnologies(listOf(base.path, split.path)))
+    assertEquals(listOf("flutter"), AppFrameworkDetector.detect(listOf(base.path, split.path)))
+    assertEquals(
+      listOf("flutter"),
+      AppFrameworkDetector.detectTechnologies(listOf(base.path, truncated.path, wrongMagic.path, elsewhere.path))
+    )
   }
 
   @Test
@@ -145,6 +210,7 @@ internal class AppFrameworkDetectorTest {
     for (failed in listOf(missing, corrupt)) {
       assertThrows(IOException::class.java) { AppFrameworkDetector.detect(listOf(base.path, failed.path)) }
       assertThrows(IOException::class.java) { AppFrameworkDetector.detect(listOf(failed.path)) }
+      assertThrows(IOException::class.java) { AppFrameworkDetector.detectTechnologies(listOf(base.path, failed.path)) }
     }
   }
 
@@ -155,11 +221,14 @@ internal class AppFrameworkDetectorTest {
     }
   }
 
-  private fun apk(name: String, vararg entries: String): File = temporaryFolder.newFile(name).also { file ->
+  private fun apk(name: String, vararg entries: String): File =
+    apk(name, entries.associateWith { byteArrayOf(0) })
+
+  private fun apk(name: String, entries: Map<String, ByteArray>): File = temporaryFolder.newFile(name).also { file ->
     ZipOutputStream(file.outputStream()).use { output ->
-      for (entry in entries) {
+      for ((entry, bytes) in entries) {
         output.putNextEntry(ZipEntry(entry))
-        if (!entry.endsWith("/")) output.write(byteArrayOf(0))
+        if (!entry.endsWith("/")) output.write(bytes)
         output.closeEntry()
       }
     }

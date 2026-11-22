@@ -115,9 +115,24 @@ abstract final class FlutterDeviceAppsAndroid {
         .toList();
   }
 
-  /// Finds known framework components in the base and installed split APKs.
+  /// Finds packaged technologies in the base and installed split APKs.
+  ///
+  /// A match can come from a dependency and appear in multiple categories.
+  /// An unavailable package or unreadable APK throws.
+  static Future<AndroidAppTechnologies> detectAppTechnologies(String packageName) async {
+    final List<Object?>? raw = await _invokeMethod<List<Object?>>('detectAppTechnologies', {
+      'packageName': packageName,
+    });
+    final Set<String> names = raw?.whereType<String>().toSet() ?? {};
+    return AndroidAppTechnologies(
+      AndroidAppTechnology.values.where((technology) => names.contains(technology.name)),
+    );
+  }
+
+  /// Finds legacy framework components in the base and installed split APKs.
   /// A match can come from a transitive dependency. No match returns an empty
   /// list, and an unavailable package or unreadable APK throws.
+  @Deprecated('Use detectAppTechnologies() for categorized results.')
   static Future<List<AndroidAppFramework>> detectAppFrameworks(String packageName) async {
     final List raw = await _invokeMethod('detectAppFrameworks', {'packageName': packageName});
     return raw.cast<String>().map(AndroidAppFramework.values.byName).toList();

@@ -177,7 +177,22 @@ internal class FlutterDeviceAppsAndroidPluginTest {
     }
   }
 
-  // ---- detectAppFrameworks ----
+  // ---- APK technology detection ----
+  @Test
+  fun detectAppTechnologies_routesTheCategorizedApiToTheExpandedScanner() {
+    val base = frameworkApk("base.apk", "META-INF/kotlin-stdlib.kotlin_module")
+    val split = frameworkApk("split.apk", "lib/arm64-v8a/libhermesvm.so")
+    val info = ApplicationInfo().apply {
+      packageName = "com.example.app"
+      sourceDir = base.path
+      splitSourceDirs = arrayOf(split.path)
+    }
+    val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), frameworkPackageManager(info))
+    val result = queryMethod(testPlugin, "detectAppTechnologies", mapOf("packageName" to info.packageName))
+    assertNull(result.errorCode)
+    assertEquals(listOf("kotlinStandardLibrary", "hermes"), result.value)
+  }
+
   @Test
   @Config(sdk = [28, 33])
   @Suppress("DEPRECATION")
@@ -218,13 +233,15 @@ internal class FlutterDeviceAppsAndroidPluginTest {
   }
 
   @Test
-  fun detectAppFrameworks_rejectsMissingBlankOrNonStringNames() {
+  fun detectionRejectsMissingBlankOrNonStringNames() {
     val packageManager = mock(PackageManager::class.java)
     val testPlugin = TestableFlutterDeviceAppsAndroidPlugin(RuntimeEnvironment.getApplication(), packageManager)
-    for (args in listOf(null, emptyMap<String, Any?>(), mapOf("packageName" to ""), mapOf("packageName" to " "), mapOf("packageName" to 1))) {
-      val result = createMockResult()
-      testPlugin.onMethodCall(MethodCall("detectAppFrameworks", args), result)
-      verify(result).error(Mockito.eq("ARG"), Mockito.eq("packageName required"), Mockito.isNull())
+    for (method in listOf("detectAppFrameworks", "detectAppTechnologies")) {
+      for (args in listOf(null, emptyMap<String, Any?>(), mapOf("packageName" to ""), mapOf("packageName" to " "), mapOf("packageName" to 1))) {
+        val result = createMockResult()
+        testPlugin.onMethodCall(MethodCall(method, args), result)
+        verify(result).error(Mockito.eq("ARG"), Mockito.eq("packageName required"), Mockito.isNull())
+      }
     }
     Mockito.verifyNoInteractions(packageManager)
   }

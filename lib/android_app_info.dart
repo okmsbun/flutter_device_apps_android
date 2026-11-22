@@ -4,6 +4,7 @@ import 'dart:typed_data';
 ///
 /// A match indicates a packaged component, not which technology renders every
 /// screen or whether that component is currently in use.
+@Deprecated('Use AndroidAppTechnology with FlutterDeviceAppsAndroid.detectAppTechnologies().')
 enum AndroidAppFramework {
   /// Flutter engine libraries.
   flutter,
@@ -245,7 +246,7 @@ class AndroidAppInstallSourceInfo {
 }
 
 /// The legacy name for [AndroidAppFramework].
-@Deprecated('Use AndroidAppFramework instead.')
+@Deprecated('Use AndroidAppTechnology with FlutterDeviceAppsAndroid.detectAppTechnologies().')
 typedef AppFramework = AndroidAppFramework;
 
 /// The legacy name for [AndroidAppInfo].

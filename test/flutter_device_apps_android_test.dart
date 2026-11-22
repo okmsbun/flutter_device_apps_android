@@ -230,11 +230,113 @@ void main() {
     });
   });
 
+  group('detectAppTechnologies', () {
+    test(
+      'groups all identifiers, supports multiple categories, and forwards the package',
+      () async {
+        final AndroidAppTechnologies technologies =
+            await FlutterDeviceAppsAndroid.detectAppTechnologies('com.example.app');
+        expect(_technologyNames(technologies.frameworks), [
+          'flutter',
+          'reactNative',
+          'dotnetAndroid',
+          'capacitor',
+          'cordova',
+          'qt',
+          'nativeScript',
+        ]);
+        expect(technologies.programmingLanguages, [AndroidAppTechnology.dart]);
+        expect(_technologyNames(technologies.uiToolkits), [
+          'flutter',
+          'reactNative',
+          'jetpackCompose',
+          'qtWidgets',
+          'qtQuick',
+        ]);
+        expect(_technologyNames(technologies.gameEngines), ['unity', 'unrealEngine', 'godot']);
+        expect(_technologyNames(technologies.runtimes), [
+          'dotnetAndroid',
+          'capacitor',
+          'nativeScript',
+          'hermes',
+          'javaScriptCore',
+          'mono',
+          'il2cpp',
+        ]);
+        expect(_technologyNames(technologies.libraries), [
+          'kotlinStandardLibrary',
+          'androidxAppCompat',
+          'qt',
+          'sdl',
+          'qtWidgets',
+          'qtQuick',
+          'kotlinCoroutines',
+        ]);
+        expect(
+          () => technologies.frameworks.add(AndroidAppTechnology.flutter),
+          throwsUnsupportedError,
+        );
+        expect(methodCalls, hasLength(1));
+        expect(methodCalls.single.method, 'detectAppTechnologies');
+        expect(methodCalls.single.arguments, {'packageName': 'com.example.app'});
+      },
+    );
+
+    test(
+      'does not infer languages from libraries, frameworks, game engines, or runtimes',
+      () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+          const MethodChannel('flutter_device_apps/methods'),
+          (MethodCall call) async => ['flutter', 'unity', 'hermes', 'kotlinStandardLibrary'],
+        );
+        final AndroidAppTechnologies technologies =
+            await FlutterDeviceAppsAndroid.detectAppTechnologies('com.example.app');
+        expect(technologies.programmingLanguages, isEmpty);
+        expect(technologies.libraries, [AndroidAppTechnology.kotlinStandardLibrary]);
+      },
+    );
+
+    test('returns six empty lists when no markers match', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('flutter_device_apps/methods'),
+        (MethodCall call) async => <String>[],
+      );
+      final AndroidAppTechnologies technologies =
+          await FlutterDeviceAppsAndroid.detectAppTechnologies('com.example.app');
+      expect([
+        technologies.frameworks,
+        technologies.programmingLanguages,
+        technologies.uiToolkits,
+        technologies.gameEngines,
+        technologies.runtimes,
+        technologies.libraries,
+      ], everyElement(isEmpty));
+    });
+
+    test('propagates argument, package, and scan failures', () async {
+      for (final code in ['ARG', 'APP_NOT_FOUND', 'ERR_FRAMEWORK_SCAN']) {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+          const MethodChannel('flutter_device_apps/methods'),
+          (MethodCall call) async => throw PlatformException(code: code),
+        );
+        await expectLater(
+          FlutterDeviceAppsAndroid.detectAppTechnologies('com.example.app'),
+          throwsA(isA<PlatformException>().having((error) => error.code, 'code', code)),
+        );
+      }
+    });
+  });
+
   group('detectAppFrameworks', () {
-    test('decodes all native identifiers and forwards the exact package name', () async {
-      final List<AndroidAppFramework> frameworks =
-          await FlutterDeviceAppsAndroid.detectAppFrameworks('com.example.app');
-      expect(frameworks, AndroidAppFramework.values);
+    test('preserves the legacy channel and returns the legacy enum values', () async {
+      expect(
+        // Verify the entry point used by existing Android clients.
+        // ignore: deprecated_member_use_from_same_package
+        await FlutterDeviceAppsAndroid.detectAppFrameworks('com.example.app'),
+        // Verify the original enum values as part of the compatibility contract.
+        // ignore: deprecated_member_use_from_same_package
+        AndroidAppFramework.values,
+      );
       expect(methodCalls, hasLength(1));
       expect(methodCalls.single.method, 'detectAppFrameworks');
       expect(methodCalls.single.arguments, {'packageName': 'com.example.app'});
@@ -245,6 +347,8 @@ void main() {
         const MethodChannel('flutter_device_apps/methods'),
         (MethodCall call) async => <String>[],
       );
+      // The legacy API must still decode an empty native response.
+      // ignore: deprecated_member_use_from_same_package
       expect(await FlutterDeviceAppsAndroid.detectAppFrameworks('com.example.app'), isEmpty);
     });
 
@@ -255,6 +359,8 @@ void main() {
           (MethodCall call) async => throw PlatformException(code: code),
         );
         await expectLater(
+          // The legacy API must still surface native errors.
+          // ignore: deprecated_member_use_from_same_package
           FlutterDeviceAppsAndroid.detectAppFrameworks('com.example.app'),
           throwsA(isA<PlatformException>().having((error) => error.code, 'code', code)),
         );
@@ -488,6 +594,9 @@ void main() {
   });
 }
 
+Iterable<String> _technologyNames(List<AndroidAppTechnology> technologies) =>
+    technologies.map((technology) => technology.name);
+
 /// Mock handler for method calls
 Object? _handleMethodCall(MethodCall call) {
   final args = call.arguments as Map<Object?, Object?>?;
@@ -503,6 +612,34 @@ Object? _handleMethodCall(MethodCall call) {
       return [
         _createAppMap('com.example.app2', 'App 2'),
         _createAppMap('com.example.app1', 'App 1'),
+      ];
+
+    case 'detectAppTechnologies':
+      return [
+        'dart',
+        'kotlinStandardLibrary',
+        'flutter',
+        'reactNative',
+        'unity',
+        'unrealEngine',
+        'godot',
+        'dotnetAndroid',
+        'jetpackCompose',
+        'androidxAppCompat',
+        'capacitor',
+        'cordova',
+        'qt',
+        'nativeScript',
+        'sdl',
+        'qtWidgets',
+        'qtQuick',
+        'hermes',
+        'javaScriptCore',
+        'mono',
+        'il2cpp',
+        'kotlinCoroutines',
+        'flutter',
+        'unknownFutureMarker',
       ];
 
     case 'detectAppFrameworks':
