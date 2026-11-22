@@ -66,11 +66,11 @@ void main() {
               for (final name in ['org.other.app', 'com.example.app'])
                 {...app(name), if (args['includeIcons'] == true) 'iconBytes': icon},
             ];
-          case 'detectAppFrameworks':
+          case 'detectAppTechnologies':
             if (packageName == 'com.missing.app') throw PlatformException(code: 'APP_NOT_FOUND');
             if (packageName == 'com.error.app') throw PlatformException(code: 'ERR_FRAMEWORK_SCAN');
-            if (packageName == 'com.no.framework') return <String>[];
-            return ['flutter', 'jetpackCompose', 'kotlin'];
+            if (packageName == 'com.no.technology') return <String>[];
+            return ['flutter', 'jetpackCompose', 'kotlinStandardLibrary'];
           case 'getApp':
             if (packageName == 'com.missing.app') return null;
             return app(packageName! as String);
@@ -240,34 +240,37 @@ void main() {
     await disposeExample(tester);
   });
 
-  testWidgets('framework detection is on demand and displays multiple or no matches', (
+  testWidgets('technology detection is on demand and displays categories or an empty result', (
     tester,
   ) async {
     await startExample(tester);
-    expect(calls.any((call) => call.method == 'detectAppFrameworks'), isFalse);
+    expect(calls.any((call) => call.method == 'detectAppTechnologies'), isFalse);
     await tester.enterText(input('Package name'), 'com.example.app');
     calls.clear();
-    await press(tester, 'Detect Frameworks');
+    await press(tester, 'Detect Technologies');
     expect(calls, hasLength(1));
-    expect(calls.single.method, 'detectAppFrameworks');
+    expect(calls.single.method, 'detectAppTechnologies');
     expect(calls.single.arguments, {'packageName': 'com.example.app'});
-    expect(find.text('flutter, jetpackCompose, kotlin'), findsOneWidget);
+    expect(find.textContaining('Frameworks: flutter'), findsOneWidget);
+    expect(find.textContaining('UI toolkits: flutter, jetpackCompose'), findsOneWidget);
+    expect(find.textContaining('Libraries: kotlinStandardLibrary'), findsOneWidget);
+    expect(find.textContaining('Programming languages:'), findsNothing);
 
-    await tester.enterText(input('Package name'), 'com.no.framework');
-    await press(tester, 'Detect Frameworks');
+    await tester.enterText(input('Package name'), 'com.no.technology');
+    await press(tester, 'Detect Technologies');
     expect(find.text('No supported indicators found'), findsOneWidget);
-    expect(find.text('flutter, jetpackCompose, kotlin'), findsNothing);
+    expect(find.textContaining('Frameworks: flutter'), findsNothing);
     await disposeExample(tester);
   });
 
-  testWidgets('framework scan failures are displayed separately from empty results', (
+  testWidgets('technology scan failures are displayed separately from empty results', (
     tester,
   ) async {
     await startExample(tester);
     for (final packageName in ['com.error.app', 'com.missing.app']) {
       await tester.enterText(input('Package name'), packageName);
-      await press(tester, 'Detect Frameworks');
-      expect(find.textContaining('Error detecting frameworks:'), findsOneWidget);
+      await press(tester, 'Detect Technologies');
+      expect(find.textContaining('Error detecting technologies:'), findsOneWidget);
       expect(find.text('No supported indicators found'), findsNothing);
     }
     expect(tester.takeException(), isNull);

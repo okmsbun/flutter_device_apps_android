@@ -263,27 +263,38 @@ class _AppManagerScreenState extends State<AppManagerScreen> {
     }
   }
 
-  Future<void> _detectAppFrameworks() async {
+  Future<void> _detectAppTechnologies() async {
     final packageName = _queryPackageName();
     if (packageName == null) return;
     setState(() {
       _queryLoading = true;
-      _queryResults.remove('Frameworks');
-      _statusMessage = 'Scanning framework indicators for $packageName...';
+      _queryResults.remove('Technologies');
+      _statusMessage = 'Scanning packaged technologies for $packageName...';
     });
     try {
-      final List<AndroidAppFramework> frameworks =
-          await FlutterDeviceAppsAndroid.detectAppFrameworks(packageName);
+      final AndroidAppTechnologies technologies =
+          await FlutterDeviceAppsAndroid.detectAppTechnologies(packageName);
       if (!mounted) return;
+      final categories = {
+        'Frameworks': technologies.frameworks,
+        'Programming languages': technologies.programmingLanguages,
+        'UI toolkits': technologies.uiToolkits,
+        'Game engines': technologies.gameEngines,
+        'Runtimes': technologies.runtimes,
+        'Libraries': technologies.libraries,
+      };
+      final String summary = [
+        for (final category in categories.entries)
+          if (category.value.isNotEmpty)
+            '${category.key}: ${category.value.map((technology) => technology.name).join(', ')}',
+      ].join('\n');
       setState(() {
-        _queryResults['Frameworks'] = frameworks.isEmpty
-            ? 'No supported indicators found'
-            : frameworks.map((framework) => framework.name).join(', ');
-        _statusMessage = 'Framework scan complete';
+        _queryResults['Technologies'] = summary.isEmpty ? 'No supported indicators found' : summary;
+        _statusMessage = 'Technology scan complete';
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _statusMessage = 'Error detecting frameworks: $e');
+      setState(() => _statusMessage = 'Error detecting technologies: $e');
     } finally {
       if (mounted) setState(() => _queryLoading = false);
     }
@@ -797,8 +808,8 @@ class _AppManagerScreenState extends State<AppManagerScreen> {
               child: const Text('Install Source'),
             ),
             ElevatedButton(
-              onPressed: _canQueryPackage ? _detectAppFrameworks : null,
-              child: const Text('Detect Frameworks'),
+              onPressed: _canQueryPackage ? _detectAppTechnologies : null,
+              child: const Text('Detect Technologies'),
             ),
             ElevatedButton(
               onPressed: _canQueryPackage
