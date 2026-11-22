@@ -103,10 +103,10 @@ installed split APKs. The result groups matches into `frameworks`,
 `programmingLanguages`, `uiToolkits`, `gameEngines`, `runtimes`, and `libraries`.
 A framework such as Flutter can also appear under UI toolkits.
 
-Languages require a direct packaged code marker. For example, Dart is reported
-when the Flutter assets contain a Dart Kernel header. A Kotlin standard library
-match appears under libraries. A category can be empty, and an invisible
-package or an unreadable APK throws.
+Languages require a direct packaged code marker. Dart can match a Kernel header
+in Flutter assets or matching AOT exports in a packaged `libapp.so`. A Kotlin
+standard library match appears under libraries. A category can be empty,
+and an invisible package or an unreadable APK throws.
 
 See the [supported technologies](../README.md#detect-packaged-app-technologies).
 Existing `detectAppFrameworks` calls retain their flat results and emit a

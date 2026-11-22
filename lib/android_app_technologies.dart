@@ -26,8 +26,12 @@ enum AndroidAppTechnology {
   il2cpp({_Category.runtimes}),
   kotlinCoroutines({_Category.libraries}),
 
-  /// Dart code identified by a packaged Dart Kernel binary.
-  dart({_Category.programmingLanguages});
+  /// Dart code identified by a packaged Dart Kernel or AOT snapshot.
+  dart({_Category.programmingLanguages}),
+  v8({_Category.runtimes}),
+  cocosCreator({_Category.gameEngines}),
+  composeMaterial3({_Category.libraries}),
+  androidMaterialComponents({_Category.libraries});
 
   const AndroidAppTechnology(this._categories);
 
@@ -67,7 +71,7 @@ class AndroidAppTechnologies {
 
   final List<AndroidAppTechnology> frameworks;
 
-  /// Languages identified from packaged code, such as a Dart Kernel binary.
+  /// Languages identified from packaged code, such as a Dart Kernel or AOT snapshot.
   ///
   /// Framework and runtime libraries alone do not identify source languages.
   final List<AndroidAppTechnology> programmingLanguages;

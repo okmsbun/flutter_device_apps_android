@@ -253,7 +253,12 @@ void main() {
           'qtWidgets',
           'qtQuick',
         ]);
-        expect(_technologyNames(technologies.gameEngines), ['unity', 'unrealEngine', 'godot']);
+        expect(_technologyNames(technologies.gameEngines), [
+          'unity',
+          'unrealEngine',
+          'godot',
+          'cocosCreator',
+        ]);
         expect(_technologyNames(technologies.runtimes), [
           'dotnetAndroid',
           'capacitor',
@@ -262,6 +267,7 @@ void main() {
           'javaScriptCore',
           'mono',
           'il2cpp',
+          'v8',
         ]);
         expect(_technologyNames(technologies.libraries), [
           'kotlinStandardLibrary',
@@ -271,6 +277,8 @@ void main() {
           'qtWidgets',
           'qtQuick',
           'kotlinCoroutines',
+          'composeMaterial3',
+          'androidMaterialComponents',
         ]);
         expect(
           () => technologies.frameworks.add(AndroidAppTechnology.flutter),
@@ -638,6 +646,10 @@ Object? _handleMethodCall(MethodCall call) {
         'mono',
         'il2cpp',
         'kotlinCoroutines',
+        'v8',
+        'cocosCreator',
+        'composeMaterial3',
+        'androidMaterialComponents',
         'flutter',
         'unknownFutureMarker',
       ];

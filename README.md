@@ -79,15 +79,15 @@ that the scan found no supported markers for those categories. A failed scan thr
 | Category | Supported technologies |
 | --- | --- |
 | `frameworks` | Flutter, React Native, .NET for Android, Capacitor, Cordova, Qt, NativeScript |
-| `programmingLanguages` | Dart, when a Dart Kernel binary is present |
+| `programmingLanguages` | Dart Kernel and AOT snapshots |
 | `uiToolkits` | Flutter, React Native, Jetpack Compose, Qt Widgets, Qt Quick |
-| `gameEngines` | Unity, Unreal Engine, Godot |
-| `runtimes` | .NET for Android, Capacitor, NativeScript, Hermes, JavaScriptCore, Mono, IL2CPP |
-| `libraries` | Kotlin standard library, AndroidX AppCompat, Qt Core, Qt Widgets, Qt Quick, SDL 2/3, Kotlin coroutines |
+| `gameEngines` | Unity, Unreal Engine, Godot, Cocos Creator |
+| `runtimes` | .NET for Android, Capacitor, NativeScript, Hermes, JavaScriptCore, Mono, IL2CPP, V8 |
+| `libraries` | Kotlin standard library, AndroidX AppCompat, Qt Core, Qt Widgets, Qt Quick, SDL 2/3, Kotlin coroutines, Compose Material 3, Android Material Components |
 
-Language detection relies on packaged code. The Kotlin standard library counts
-as a library, and the Flutter engine alone yields no Dart language result.
-Flutter release builds without a Kernel asset may leave the language list empty.
+Language detection relies on packaged code. Dart matches a Kernel header or
+a supported pair of Dart AOT exports in `libapp.so`, including in release builds.
+The Kotlin standard library appears under `libraries`.
 
 `detectAppFrameworks()` and `AndroidAppFramework` remain available as deprecated APIs
 with their original flat results.

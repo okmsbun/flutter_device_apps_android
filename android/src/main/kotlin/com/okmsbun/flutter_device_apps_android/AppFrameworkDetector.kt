@@ -38,13 +38,17 @@ internal object AppFrameworkDetector {
     "libhermesvm.so" to "hermes",
     "libjsc.so" to "javaScriptCore",
     "libmonosgen-2.0.so" to "mono",
-    "libil2cpp.so" to "il2cpp"
+    "libil2cpp.so" to "il2cpp",
+    "libv8android.so" to "v8",
+    "libcocos.so" to "cocosCreator"
   )
   private val technologyByEntry = frameworkByEntry.mapValues { (_, framework) ->
     if (framework == "kotlin") "kotlinStandardLibrary" else framework
   } + mapOf(
     "META-INF/kotlinx_coroutines_core.version" to "kotlinCoroutines",
-    "META-INF/kotlinx_coroutines_android.version" to "kotlinCoroutines"
+    "META-INF/kotlinx_coroutines_android.version" to "kotlinCoroutines",
+    "META-INF/androidx.compose.material3_material3.version" to "composeMaterial3",
+    "META-INF/com.google.android.material_material.version" to "androidMaterialComponents"
   )
   private val nativeLibraryEntry = Regex("lib/([A-Za-z0-9][A-Za-z0-9_-]*)/([^/]+)")
   private val dartKernelMagic = intArrayOf(0x90, 0xAB, 0xCD, 0xEF)
@@ -69,17 +73,23 @@ internal object AppFrameworkDetector {
     val detected = mutableSetOf<String>()
     for (path in apkPaths.distinct()) {
       ZipFile(path).use { apk ->
+        if (includeAdditionalTechnologies && "dart" !in detected && hasDartKernel(apk)) {
+          detected.add("dart")
+        }
         val entries = apk.entries()
         while (entries.hasMoreElements()) {
           val entry = entries.nextElement()
           if (entry.isDirectory) continue
+          if (includeAdditionalTechnologies && "dart" !in detected &&
+            entry.name.endsWith("/libapp.so") && nativeLibraryEntry.matches(entry.name) &&
+            DartAotDetector.matches(apk, entry)
+          ) {
+            detected.add("dart")
+          }
           val technology = entryMarkers[entry.name]
             ?: matchNativeLibrary(entry.name, libraryMarkers)
             ?: continue
           detected.add(technology)
-        }
-        if (includeAdditionalTechnologies && hasDartKernel(apk)) {
-          detected.add("dart")
         }
       }
     }
